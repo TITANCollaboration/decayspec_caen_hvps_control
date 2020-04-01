@@ -13,8 +13,6 @@ import caen
 from ctypes import *
 
 
-CAEN_SYSTEM_TYPE = 6  # R(something)
-CAEN_LINK_TYPE = 0  # TCP/IP (network link)
 # *************************************************************************************
 # HVPS_Channel
 # Setup a class of objects that represent one channel on the HVPS
@@ -32,16 +30,16 @@ class HVPS_Channel:
 
     def bias_channel(self, caen_system_info_dict):
         return_code, handle = caen.init(caen_system_info_dict)
+        caen.set_channel_parameters(handle, self.channel_num, action="BIAS")
         print("Bias channel!")
 
     def unbias_channel(self, caen_system_info_dict):
         return_code, handle = caen.init(caen_system_info_dict)
-
+        caen.set_channel_parameters(handle, self.channel_num, action="UNBIAS")
         print("Unbias channel")
 
     def status_channel(self, caen_system_info_dict):
         return_code, handle = caen.init(caen_system_info_dict)
-
         print("This is my status")
 
 
@@ -130,10 +128,17 @@ def process_cli_args(args, hvps_channel_list, caen_system_info_dict):
         chan_obj.bias_channel(caen_system_info_dict)
 
     if args.action == "status":
+        chan_status = []
         print("Lets get status!")
-        chan_obj = find_channel_num_or_det_name(args.channel_selected, hvps_channel_list)
         if args.channel_selected.upper() == "ALL":
-            print("Loop over all the channels and stuff..")
+            for mychan in hvps_channel_list:
+                mychan_num = mychan.channel_num
+                chan_obj = find_channel_num_or_det_name(mychan_num, hvps_channel_list)
+                chan_status.append(chan_obj.status_channel(caen_system_info_dict))
+
+        chan_obj = find_channel_num_or_det_name(args.channel_selected, hvps_channel_list)
+        chan_status.append(chan_obj.status_channel(caen_system_info_dict))
+
 
 
 def main():
