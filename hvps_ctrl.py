@@ -9,39 +9,9 @@ import argparse
 import configparser
 import sys
 import os
+from hvps import HVPS_Channel
+import pprint
 import caen
-from ctypes import *
-
-
-# *************************************************************************************
-# HVPS_Channel
-# Setup a class of objects that represent one channel on the HVPS
-# This allows one to easily create a list of these objects which can represent all the
-# channels on the HVPS
-# *************************************************************************************
-class HVPS_Channel:
-    def __init__(self, channel_num, enabled, detector_name, detector_position, max_bias_voltage, ramp_rate):
-        self.channel_num = channel_num
-        self.enabled = enabled
-        self.detector_name = detector_name
-        self.detector_position = detector_position
-        self.max_bias_voltage = max_bias_voltage
-        self.ramp_rate = ramp_rate
-
-    def bias_channel(self, caen_system_info_dict):
-        return_code, handle = caen.init(caen_system_info_dict)
-        caen.set_channel_parameters(handle, self.channel_num, action="BIAS")
-        print("Bias channel!")
-
-    def unbias_channel(self, caen_system_info_dict):
-        return_code, handle = caen.init(caen_system_info_dict)
-        caen.set_channel_parameters(handle, self.channel_num, action="UNBIAS")
-        print("Unbias channel")
-
-    def status_channel(self, caen_system_info_dict):
-        return_code, handle = caen.init(caen_system_info_dict)
-        print("This is my status")
-
 
 def getConfigEntry(config, heading, item, reqd=False, remove_spaces=True, default_val=''):
     #  Just a helper function to process config file lines, strip out white spaces and check if requred etc.
@@ -121,32 +91,39 @@ def confirm_channel(chan_obj, action):
 
 
 def process_cli_args(args, hvps_channel_list, caen_system_info_dict):
-    if (args.action == "bias") or (args.action == "unbias"):
-        chan_obj = find_channel_num_or_det_name(args.channel_selected, hvps_channel_list)
-        print("Lets Bias or Unbias!")
-        confirm_channel(chan_obj, args.action)
-        chan_obj.bias_channel(caen_system_info_dict)
-
-    if args.action == "status":
-        chan_status = []
-        print("Lets get status!")
-        if args.channel_selected.upper() == "ALL":
-            for mychan in hvps_channel_list:
-                mychan_num = mychan.channel_num
-                chan_obj = find_channel_num_or_det_name(mychan_num, hvps_channel_list)
-                chan_status.append(chan_obj.status_channel(caen_system_info_dict))
-
-        chan_obj = find_channel_num_or_det_name(args.channel_selected, hvps_channel_list)
-        chan_status.append(chan_obj.status_channel(caen_system_info_dict))
-
-
+    print("Got here!")
+    pprint.pprint(caen_system_info_dict)
+    handle = caen.init(caen_system_info_dict)
+    #caen.channel_status(handle, 1)
+    #print("Hello", caen.deinit(handle))
+    caen.get_channel_name(handle)
+    #caen.channel_status(handle, 1)
+    #caen.get_system_property_list(handle)
+#    if (args.action == "bias") or (args.action == "unbias"):
+#        chan_obj = find_channel_num_or_det_name(args.channel_selected, hvps_channel_list)
+#        print("Lets Bias or Unbias!")
+#        confirm_channel(chan_obj, args.action)
+#        chan_obj.bias_channel(caen_system_info_dict)
+#
+#    if args.action == "status":
+#        chan_status = []
+#        print("Lets get status!")
+#        if args.channel_selected.upper() == "ALL":
+#            for mychan in hvps_channel_list:
+#                mychan_num = mychan.channel_num
+#                chan_obj = find_channel_num_or_det_name(mychan_num, hvps_channel_list)
+#                chan_status.append(chan_obj.status_channel(caen_system_info_dict))
+#
+#        chan_obj = find_channel_num_or_det_name(args.channel_selected, hvps_channel_list)
+#        chan_status.append(chan_obj.status_channel(caen_system_info_dict))
+#
 
 def main():
     parser = argparse.ArgumentParser(description='HVPS Controller', usage='%(prog)s --action [bias, unbias, status] --channel [channel num]')
 
-    parser.add_argument('--action', choices=('bias', 'unbias', 'status'), required=True)
+    parser.add_argument('--action', choices=('bias', 'unbias', 'status'), required=False)
 
-    parser.add_argument('--channel', dest='channel_selected', required=True,
+    parser.add_argument('--channel', dest='channel_selected', required=False,
                         help="Specify channel to take action against, specify channel number or ALL")
 
     parser.add_argument('--config_file', dest='config_file', required=False,
