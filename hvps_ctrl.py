@@ -11,7 +11,10 @@ import sys
 import os
 from hvps import HVPS_Channel
 import pprint
-import caen
+from caen import CAEN_Controller
+from ctypes import *
+import time
+
 
 def getConfigEntry(config, heading, item, reqd=False, remove_spaces=True, default_val=''):
     #  Just a helper function to process config file lines, strip out white spaces and check if requred etc.
@@ -46,7 +49,7 @@ def process_config_file(config_file):
             if channel_section == "SYSTEM":
                 caen_system_info_dict["system_type"] = int(getConfigEntry(config, channel_section, 'caen_system_type', reqd=True, remove_spaces=True))
                 caen_system_info_dict["link_type"] = int(getConfigEntry(config, channel_section, 'caen_link_type', reqd=True, remove_spaces=True))
-                caen_system_info_dict["ip_address"] = getConfigEntry(config, channel_section, 'caen_ip_address', reqd=True, remove_spaces=True)
+                caen_system_info_dict["hostname"] = getConfigEntry(config, channel_section, 'caen_hostname', reqd=True, remove_spaces=True)
                 caen_system_info_dict["username"] = getConfigEntry(config, channel_section, 'caen_username', reqd=True, remove_spaces=True)
                 caen_system_info_dict["password"] = getConfigEntry(config, channel_section, 'caen_password', reqd=True, remove_spaces=True)
             else:
@@ -91,12 +94,19 @@ def confirm_channel(chan_obj, action):
 
 
 def process_cli_args(args, hvps_channel_list, caen_system_info_dict):
-    print("Got here!")
+    myslot = 0
     pprint.pprint(caen_system_info_dict)
-    handle = caen.init(caen_system_info_dict)
-    #caen.channel_status(handle, 1)
+    #print(caen.deinit(0))
+    #system_type, hostname, username, password, link_type=0):
+    CC = CAEN_Controller(caen_system_info_dict["system_type"], caen_system_info_dict["hostname"], caen_system_info_dict["username"], caen_system_info_dict["password"], caen_system_info_dict["link_type"])
+    CC.init()
+    #CC.get_channel_names(myslot, [0, 1, 3])
+    #CC.get_board_info(myslot)
+    CC.get_all_info_for_channels(myslot, [0])
+    CC.deinit()
+    #caen.deinit(handle)
+ #caen.channel_status(handle, 1)
     #print("Hello", caen.deinit(handle))
-    caen.get_channel_name(handle)
     #caen.channel_status(handle, 1)
     #caen.get_system_property_list(handle)
 #    if (args.action == "bias") or (args.action == "unbias"):
@@ -136,7 +146,7 @@ def main():
     print(args)
     hvps_channel_list, caen_system_info_dict = process_config_file(args.config_file)
     hvps_channel_action = process_cli_args(args, hvps_channel_list, caen_system_info_dict)
-    print(hvps_channel_list, hvps_channel_action)
+    #print(hvps_channel_list, hvps_channel_action)
 
 
 if __name__ == "__main__":
