@@ -7,15 +7,24 @@ class CAEN_Controller:
     def __init__(self, system_type, hostname, username, password, link_type=0):
         self.MAX_CHANNEL_NAME_LENGHT = 12  # This is hardcoded at this time in the CAEN C-API
         self.MAX_PARAM_LENGTH = 10  # this too is hardcoded and needed for nasty pointer indexing caused by the char ** they like to use
-        self.libcaenhvwrapper_so = cdll.LoadLibrary('libcaenhvwrapper.so')
+        self.PARAM_TYPE = {0: "numeric", 1: "onoff", 2: "chstatus", 3: "bdstatus", 4: "binary", 5: "string", 6: "enum"}
+        try:
+            self.libcaenhvwrapper_so = cdll.LoadLibrary('libcaenhvwrapper.so')
+        except:
+            print("Could not load CAEN's C library : libcaenhvwrapper.so")
+            print("It needs to be in in one of the directories listed in your LD_LIBRARY_PATH environment variable")
+            exit(1)
 
         self.system_type = system_type
         self.hostname = hostname
         self.username = username
         self.password = password
         self.link_type = link_type
-
-        self.ip_address = socket.gethostbyname(hostname).encode('utf-8')  # We need to pass the IP addresss to the C API, and we need it in utf8
+        try:
+            self.ip_address = socket.gethostbyname(hostname).encode('utf-8')  # We need to pass the IP addresss to the C API, and we need it in utf8
+        except:
+            print("Could not get the IP address for the hostname :%s", (hostname))
+            print("Or the IP address is improperly formatted")
         self.handle = c_int()
 
     def check_return_code(self, return_code):
@@ -56,22 +65,50 @@ class CAEN_Controller:
         return channel_names
 
     def get_all_info_for_channels(self, slot, channels):
-        channel_info_list = []
+        all_channels_info_list = []
         for my_channel in channels:
+            full_channel_parameters_list = []
+            channel_info_dict = {}
             c_channel_params_num = (c_int * 1)()
             c_channel_info_list = c_char_p()
-
+            channel_name = self. get_channel_names(slot, [my_channel])
             return_code = self.libcaenhvwrapper_so.CAENHV_GetChParamInfo(self.handle, slot, my_channel, byref(c_channel_info_list), c_channel_params_num)
             self.check_return_code(return_code)
 
             num_parameters_for_channel = c_channel_params_num[0]
             channel_parameter_list = []
             for i in range(0, num_parameters_for_channel - 1):  # For this we must do weird pointer indexing
+                parameter_dict = {}
                 pointer_to_param = cast(c_channel_info_list, c_void_p).value + (i * self.MAX_PARAM_LENGTH)  # So we cast to type void_p then incriment the pointer value to move to the next actual value
-                cast(pointer_to_param, POINTER(c_char * self.MAX_PARAM_LENGTH)).contents.value.decode("utf-8")  # then we need to cast back to an array and deference the pointer and get the array value..
-                return_code = self.libcaenhvwrapper_so.CAENHV_GetChParamInfo(self.handle, slot, my_channel,)
-            print(channel_parameter_list)
-        return
+                channel_parameter_list.append(cast(pointer_to_param, POINTER(c_char * self.MAX_PARAM_LENGTH)).contents.value)  # then we need to cast back to an array and deference the pointer and get the array value..
+
+                property_type = c_void_p()
+                return_code = self.libcaenhvwrapper_so.CAENHV_GetChParamProp(self.handle, slot, my_channel, channel_parameter_list[-1], "Type".encode('utf-8'), byref(property_type))
+                self.check_return_code(return_code)
+
+                my_property_type = 0
+                if property_type.value is not None:  # I don't know why it comes out as None instead of 0 but whatever..
+                    my_property_type = property_type.value
+
+                c_channels_list = (c_ushort * 1)(*[my_channel])
+                param_value = (c_void_p * 1)()
+                return_code = self.libcaenhvwrapper_so.CAENHV_GetChParam(self.handle, slot, channel_parameter_list[-1], 1, c_channels_list, byref(param_value))
+                self.check_return_code(return_code)
+
+                cast_param_value = 0
+                if self.PARAM_TYPE[my_property_type] == "numeric":
+                    cast_param_value = cast(param_value, POINTER(c_float)).contents.value
+                elif self.PARAM_TYPE[my_property_type] == "onoff" or self.PARAM_TYPE[my_property_type] == "chstatus":
+                    cast_param_value = cast(param_value, POINTER(c_int)).contents.value
+                    # if (cast_param_value & (1<<n)):  # Checks if bit n is set to 1
+                parameter_dict = {"parameter": channel_parameter_list[-1].decode('utf-8'), "type": self.PARAM_TYPE[my_property_type], "value": cast_param_value}
+                full_channel_parameters_list.append(parameter_dict)
+            channel_info_dict = {"chan_name": channel_name[0], "chan_num": my_channel, "chan_info": full_channel_parameters_list}
+            all_channels_info_list.append(channel_info_dict)
+#            print(channel_info_dict)
+#                print("Channel NAme:",channel_name[0], "Property:", channel_parameter_list[-1].decode('utf-8'), "Value:", cast_param_value, "Type:", self.PARAM_TYPE[my_property_type])
+            # channel_info_list.append(something..)
+        return all_channels_info_list
 
     def get_board_info(self, slot):
         c_board_info_list = (c_char_p * 12)()

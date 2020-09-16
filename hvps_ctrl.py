@@ -41,27 +41,30 @@ def process_config_file(config_file):
     caen_system_info_dict = {}
     config = configparser.RawConfigParser()
 
-    if os.path.exists(config_file):
-        config.read(config_file)
+    if not os.path.exists(config_file):
+        print("Could not read config file : %s" % (config_file))
+        exit(1)
+    config.read(config_file)
 
-        for channel_section in config.sections():
-            # Read in Beam information
-            if channel_section == "SYSTEM":
-                caen_system_info_dict["system_type"] = int(getConfigEntry(config, channel_section, 'caen_system_type', reqd=True, remove_spaces=True))
-                caen_system_info_dict["link_type"] = int(getConfigEntry(config, channel_section, 'caen_link_type', reqd=True, remove_spaces=True))
-                caen_system_info_dict["hostname"] = getConfigEntry(config, channel_section, 'caen_hostname', reqd=True, remove_spaces=True)
-                caen_system_info_dict["username"] = getConfigEntry(config, channel_section, 'caen_username', reqd=True, remove_spaces=True)
-                caen_system_info_dict["password"] = getConfigEntry(config, channel_section, 'caen_password', reqd=True, remove_spaces=True)
-            else:
-                channel_num = int(getConfigEntry(config, channel_section, 'channel_num', reqd=True, remove_spaces=True))
-                enabled = getConfigEntry(config, channel_section, 'enabled', reqd=True, remove_spaces=True)
-                detector_name = getConfigEntry(config, channel_section, 'detector_name', reqd=True, remove_spaces=True)
-                detector_position = int(getConfigEntry(config, channel_section, 'detector_position', reqd=True, remove_spaces=True))
-                max_bias_voltage = int(getConfigEntry(config, channel_section, 'max_bias_voltage', reqd=True, remove_spaces=True))
-                ramp_rate = int(getConfigEntry(config, channel_section, 'ramp_rate', reqd=True, remove_spaces=True))
+    for channel_section in config.sections():
+        # Read in Beam information
+        if channel_section == "SYSTEM":
+            caen_system_info_dict["system_type"] = int(getConfigEntry(config, channel_section, 'caen_system_type', reqd=True, remove_spaces=True))
+            caen_system_info_dict["link_type"] = int(getConfigEntry(config, channel_section, 'caen_link_type', reqd=True, remove_spaces=True))
+            caen_system_info_dict["hostname"] = getConfigEntry(config, channel_section, 'caen_hostname', reqd=True, remove_spaces=True)
+            caen_system_info_dict["username"] = getConfigEntry(config, channel_section, 'caen_username', reqd=True, remove_spaces=True)
+            caen_system_info_dict["password"] = getConfigEntry(config, channel_section, 'caen_password', reqd=True, remove_spaces=True)
+        else:
+            channel_num = int(getConfigEntry(config, channel_section, 'channel_num', reqd=True, remove_spaces=True))
+            enabled = getConfigEntry(config, channel_section, 'enabled', reqd=True, remove_spaces=True)
+            detector_name = getConfigEntry(config, channel_section, 'detector_name', reqd=True, remove_spaces=True)
+            detector_position = int(getConfigEntry(config, channel_section, 'detector_position', reqd=True, remove_spaces=True))
+            max_bias_voltage = int(getConfigEntry(config, channel_section, 'max_bias_voltage', reqd=True, remove_spaces=True))
+            ramp_rate = int(getConfigEntry(config, channel_section, 'ramp_rate', reqd=True, remove_spaces=True))
 
-                hvps_channel_list.append(HVPS_Channel(channel_num, enabled, detector_name, detector_position, max_bias_voltage, ramp_rate))
+            hvps_channel_list.append(HVPS_Channel(channel_num, enabled, detector_name, detector_position, max_bias_voltage, ramp_rate))
     #    initMacroMachine(system_objects, work_dir, g4_macro_filename)
+
     return hvps_channel_list, caen_system_info_dict
 
 
@@ -100,9 +103,8 @@ def process_cli_args(args, hvps_channel_list, caen_system_info_dict):
     #system_type, hostname, username, password, link_type=0):
     CC = CAEN_Controller(caen_system_info_dict["system_type"], caen_system_info_dict["hostname"], caen_system_info_dict["username"], caen_system_info_dict["password"], caen_system_info_dict["link_type"])
     CC.init()
-    #CC.get_channel_names(myslot, [0, 1, 3])
-    #CC.get_board_info(myslot)
-    CC.get_all_info_for_channels(myslot, [0])
+    print(CC.get_channel_names(myslot, [0, 1, 3]))
+    print(CC.get_all_info_for_channels(myslot, [0, 1, 3]))
     CC.deinit()
     #caen.deinit(handle)
  #caen.channel_status(handle, 1)
@@ -129,6 +131,7 @@ def process_cli_args(args, hvps_channel_list, caen_system_info_dict):
 #
 
 def main():
+
     parser = argparse.ArgumentParser(description='HVPS Controller', usage='%(prog)s --action [bias, unbias, status] --channel [channel num]')
 
     parser.add_argument('--action', choices=('bias', 'unbias', 'status'), required=False)
@@ -147,7 +150,6 @@ def main():
     hvps_channel_list, caen_system_info_dict = process_config_file(args.config_file)
     hvps_channel_action = process_cli_args(args, hvps_channel_list, caen_system_info_dict)
     #print(hvps_channel_list, hvps_channel_action)
-
 
 if __name__ == "__main__":
     main()
