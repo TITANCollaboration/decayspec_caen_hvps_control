@@ -1,4 +1,4 @@
-from ctypes import *
+from ctypes import c_int, c_float, c_void_p, c_char_p, c_char, c_ushort, pointer, cdll, cast, POINTER, byref
 import pprint
 import socket
 
@@ -29,7 +29,8 @@ class CAEN_Controller:
 
     def check_return_code(self, return_code):
         if hex(return_code) != hex(0):
-            print("Could not connect to HVPS : %s, ERROR code : %i" % (self.ip_address, return_code))
+            print("Could not connect to HVPS : %s, ERROR code : %s" % (self.ip_address, hex(return_code)))
+            # print(cast(self.libcaenhvwrapper_so.CAENHV_GetError(self.handle), c_char_p).raw)  # this didn't work the first time, maybe i'll come back to it
             exit(1)
         else:
             return return_code
@@ -96,77 +97,54 @@ class CAEN_Controller:
                 self.check_return_code(return_code)
 
                 cast_param_value = 0
-                if self.PARAM_TYPE[my_property_type] == "numeric":
+                if self.PARAM_TYPE[my_property_type] == "numeric":  # Check what type of value we should be getting and cast the c_void_p accordingly
                     cast_param_value = cast(param_value, POINTER(c_float)).contents.value
                 elif self.PARAM_TYPE[my_property_type] == "onoff" or self.PARAM_TYPE[my_property_type] == "chstatus":
                     cast_param_value = cast(param_value, POINTER(c_int)).contents.value
                     # if (cast_param_value & (1<<n)):  # Checks if bit n is set to 1
                 parameter_dict = {"parameter": channel_parameter_list[-1].decode('utf-8'), "type": self.PARAM_TYPE[my_property_type], "value": cast_param_value}
                 full_channel_parameters_list.append(parameter_dict)
-            channel_info_dict = {"chan_name": channel_name[0], "chan_num": my_channel, "chan_info": full_channel_parameters_list}
+
+            channel_info_dict = {"chan_name": channel_name[0], "chan_num": my_channel, "slot": slot, "chan_info": full_channel_parameters_list}
             all_channels_info_list.append(channel_info_dict)
-#            print(channel_info_dict)
-#                print("Channel NAme:",channel_name[0], "Property:", channel_parameter_list[-1].decode('utf-8'), "Value:", cast_param_value, "Type:", self.PARAM_TYPE[my_property_type])
-            # channel_info_list.append(something..)
         return all_channels_info_list
 
-    def get_board_info(self, slot):
-        c_board_info_list = (c_char_p * 12)()
-        self.libcaenhvwrapper_so.CAENHV_GetBdParamInfo(self.handle, slot, c_board_info_list)
-        for i in c_board_info_list:
-            print(i)
+    def set_channel_name(self, slot, channel, channel_name):
+        #  Change the name of a single channel, I know the API allows multiple but I just don't care
+        #  !! THIS IS UNTESTED UNTIL I FLIP THE HVPS TO REMOTE FROM LOCAL
+        c_channels_list = (c_ushort * 1)(*[channel])
+
+        return_code = self.libcaenhvwrapper_so.CAENHV_SetChName(self.handle, slot, 1, c_channels_list, channel_name.encode('utf-8'))
+        self.check_return_code(return_code)
         return
 
-    def channel_status(handle, channels):
-        slot = 0  # No clue here at the moment, will figure this one out eventually, maybe when I actually have the hardware and am not coding blind
-        print("get status...")
-        slot = 0
-        list = (c_float * 1)()
-        channels_list=[1]
-        parameter_name='Pon'
-        p_parm = parameter_name.encode('utf-8')
-        nb_channels = 5
-        c_channels_list = (c_ushort * 1)(*channels_list)
-        c_parameter_values_list = (c_int * 1)()
-        somelist = []
-        # Parameter list to grab, V0Set, I0Set, Rup, RDWn, Vmon, Imon, Status, Pw
-        # I think I may have to do seveal of these calls to return all the information, this might be one of those parts I need to leave until after
-        # we get the hardware
-        libcaenhvwrapper_so.CAENHV_GetChParam(handle, 0, "Pon", 1, [1], byref(somelist))
-        #for c_parameter_value in c_parameter_values_list:
-        #    parameter_values_list.append(c_parameter_value)
-        #pprint.pprint(parameter_values_list)
-        return 0  # Will return something nice soon enough
+    def set_channel_parameter(self, slot, channel, parameter, new_value):
+        #  !! THIS IS UNTESTED UNTIL I FLIP THE HVPS TO REMOTE FROM LOCAL
+        c_channels_list = (c_ushort * 1)(*[channel])
+        c_new_value = c_float(new_value)
 
-    def get_system_property(handle):
-        mine =''
-        #b_char = .encode('utf-8')
-
-        libcaenhvwrapper_so.CAENHV_GetSysProp(handle, )
-
-    def get_system_property_list(handle):
-        prop_name_list = POINTER(POINTER(c_char)) #c_char_p()
-        num_prop = c_ushort()
-        #prop_name_list = c_wchar_p("")
-
-        #NumProp = 0
-        print(handle)
-        myreturn = libcaenhvwrapper_so.CAENHV_GetSysPropList(handle=handle, NumProp=byref(num_prop), PropNameList=byref(prop_name_list))
-        print("Got here 2", myreturn)
-        print(NumProp, prop_name_list)
+        return_code = self.libcaenhvwrapper_so.CAENHV_SetChParam(self.handle, slot, parameter.encode('utf-8'), 1, c_channels_list, c_new_value)
+        self.check_return_code(return_code)
         return
 
-    def set_channel_parameters(handle, channels, action):
-        slot = 0
-        print("Setting stuff to bias or unbias")
-        # We will want to check if we are biasing or unbiasing and what the current state of the system is.
-        # We want to catch things like bias'ing an already biased detector as there is no reason to tempt fate.
-        parameter_name='Pw'  # this is the parameter to turn the power on or off (1 = on; 0 = off I think)
-        # Also set RDWn and Rup
+    def get_crate_info(self):
+        #  Used to get number of slots and channels in a crate.  It grabs other things as well but they aren't super useful
+        c_num_of_slots = c_ushort()
+        c_num_of_channels = POINTER(c_ushort)()
+        c_description_list = c_char_p()
+        c_model_list = c_char_p()
+        c_serial_num_list = POINTER(c_ushort)()
+        c_firmware_release_min_list = c_char_p()
+        c_firmware_releae_max_list = c_char_p()
+        return_code = self.libcaenhvwrapper_so.CAENHV_GetCrateMap(self.handle,
+                                                                  byref(c_num_of_slots),
+                                                                  byref(c_num_of_channels),
+                                                                  byref(c_model_list),
+                                                                  byref(c_description_list),
+                                                                  byref(c_serial_num_list),
+                                                                  byref(c_firmware_release_min_list),
+                                                                  byref(c_firmware_releae_max_list))
 
-        if action == "BIAS":
-            print("We're going to bias!")
-            libcaenhvwrapper_so.CAENHV_SetChParam(handle, c_ushort(slot), parameter_name, c_ushort(nb_channels), c_channels_list, cast([1], c_void_p))
-        elif action == "UNBIAS":
-            print("Woo! We're going to unbias!")
-            libcaenhvwrapper_so.CAENHV_SetChParam(handle, c_ushort(slot), parameter_name, c_ushort(nb_channels), c_channels_list, cast([0], c_void_p))
+        self.check_return_code(return_code)
+        crate_info_dict = {"num_of_slots": c_num_of_slots.value, "num_of_channels": c_num_of_channels.contents.value, "model": c_model_list.value.decode('utf-8')}
+        return crate_info_dict

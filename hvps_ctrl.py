@@ -104,7 +104,11 @@ def process_cli_args(args, hvps_channel_list, caen_system_info_dict):
     CC = CAEN_Controller(caen_system_info_dict["system_type"], caen_system_info_dict["hostname"], caen_system_info_dict["username"], caen_system_info_dict["password"], caen_system_info_dict["link_type"])
     CC.init()
     print(CC.get_channel_names(myslot, [0, 1, 3]))
-    print(CC.get_all_info_for_channels(myslot, [0, 1, 3]))
+    #pprint.pprint(CC.get_all_info_for_channels(myslot, [0, 1, 3]))
+    CC.get_crate_info()
+    #CC.set_channel_name(0, 1, "newname1")
+    CC.set_channel_parameter(0, 1, "VSet", 55.0)
+
     CC.deinit()
     #caen.deinit(handle)
  #caen.channel_status(handle, 1)
