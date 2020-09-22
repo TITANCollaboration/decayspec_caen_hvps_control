@@ -65,6 +65,14 @@ class HVPS_Class:
         channel_status_list.append(hvps_entry.get_all_info_for_channels(slot, [channel]))
         return channel_status_list
 
+    def get_all_crates_info(self):
+        crate_info_list = []
+        for hvps_entry in self.hvps_systems_objects_list:
+            device_info_dict = {"device_name": hvps_entry.device_name, "hostname": hvps_entry.hostname}  # Throw in a couple extra pieces of data
+            device_info_dict.update(hvps_entry.get_crate_info())  # combine dict's
+            crate_info_list.append(device_info_dict)
+        return crate_info_list
+
     def get_all_crate_channel_statuses(self, my_hpvs_crate):
         channel_status_list = []
         crate_info_dict = my_hpvs_crate.get_crate_info()
@@ -84,3 +92,6 @@ class HVPS_Class:
             for my_hvps in self.hvps_systems_objects_list:
                 channel_status_list.append(self.get_all_crate_channel_statuses(my_hvps))
         return channel_status_list
+
+    def find_channel_by_name(self, chan_name):
+        return

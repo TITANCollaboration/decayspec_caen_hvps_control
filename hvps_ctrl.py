@@ -34,7 +34,7 @@ def getConfigEntry(config, heading, item, reqd=False, remove_spaces=True, defaul
 # *************************************************************************************
 
 
-def process_config_file(config_file):
+def process_config_file(config_file="hvps.cfg"):
     caen_system_info_list = []
     config = configparser.RawConfigParser()
 
@@ -65,17 +65,6 @@ def process_config_file(config_file):
         #     hvps_channel_list.append(HVPS_Channel(channel_num, enabled, detector_name, detector_position, max_bias_voltage, ramp_rate))
 
     return caen_system_info_list
-
-
-def find_channel_num_or_det_name(channel_selection, hvps_channel_list):
-    for chan_obj in hvps_channel_list:
-        try:
-            if chan_obj.channel_num == int(channel_selection):
-                return chan_obj
-        except:
-             print("Your channel selection must be a number from 0-15")
-    print("!! Could not find the channel # you specified.  Please make sure it is between 0-15 and is specified in the hvps.cfg file")
-    sys.exit(1)
 
 
 def confirm_channel(chan_obj, action):
@@ -125,9 +114,7 @@ def process_cli_args(args, caen_system_info_list):
         else:
             HVPS.unbias_channel(args.hvps_name, int(args.slot_selected), int(args.channel_selected))
 
-
     return
-
 
 
 def main():
