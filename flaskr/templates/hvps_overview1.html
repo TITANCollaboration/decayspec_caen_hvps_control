@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block style %}
+	rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"
+{% endblock %}
+{% block header %}
+  <h1>{% block title %}HVPS{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+<form method="POST" action="/select_channel">
+  <label for="channels">Select Channel:</label>
+  <select name="chan_name" id="chan_name">
+    {% for hvps_entry in channel_list %}
+    <optgroup label="{{hvps_entry['device_name']}}">
+      {% for channel_name in hvps_entry['channel_names'] %}
+        <option value="{{channel_name}}">{{channel_name}}</option>
+
+      {% endfor %}
+    </optgroup>
+    {% endfor %}
+  <br><br>
+  <input type="submit" value="Submit">
+</form>
+
+<form method="POST" action="/select_crate">
+  <label for="crate">Select Crate:</label>
+  <select name="crate" id="crate">
+    {% for hvps_entry in channel_list %}
+      <option value="{{hvps_entry['device_name']}}">{{hvps_entry['device_name']}}</option>
+    {% endfor %}
+  <br><br>
+  <input type="submit" value="Submit">
+</form>
+
+{% endblock %}

@@ -113,6 +113,9 @@ def process_cli_args(args, caen_system_info_list):
             print("Must specify --slot and --channel")
         else:
             HVPS.unbias_channel(args.hvps_name, int(args.slot_selected), int(args.channel_selected))
+    del HVPS
+    print("Time 2")
+    HVPS = HVPS_Class(caen_system_info_list)
 
     return
 

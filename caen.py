@@ -1,6 +1,7 @@
 from ctypes import c_int, c_float, c_void_p, c_char_p, c_char, c_ushort, pointer, cdll, cast, POINTER, byref
 import pprint
 import socket
+import time
 import sys
 
 
@@ -26,7 +27,9 @@ class CAEN_Controller:
         except:
             print("Could not get the IP address for the hostname :%s", (hostname))
             print("Or the IP address is improperly formatted")
+        self.handle = 0
         self.handle = c_int()
+        print("INIT TIME!!")
         self.init()
 
     def check_return_code(self, return_code):
@@ -34,6 +37,7 @@ class CAEN_Controller:
             print("Problem communicating with HVPS, check SLOT # and Channel # : %s, ERROR code : %s" % (self.ip_address, hex(return_code)))
             # print(cast(self.libcaenhvwrapper_so.CAENHV_GetError(self.handle), c_char_p).raw)  # this didn't work the first time, maybe i'll come back to it
             print("Calling Function:", sys._getframe(1).f_code.co_name)
+            #return 0
             exit(1)
         else:
             return return_code
@@ -50,8 +54,15 @@ class CAEN_Controller:
         print("Initialized Connection to : %s" % (self.hostname))
 
     def deinit(self):
+        print("Going to de-init!")
         # De-initilize the connection to the HVPS.
-        return_code = self.libcaenhvwrapper_so.CAENHV_DeinitSystem(self.handle)
+        print("Handle :", self.handle)
+        try:
+            return_code = self.libcaenhvwrapper_so.CAENHV_DeinitSystem(self.handle)
+        except:
+            print("Something didn't go well with de-init'ing")
+        print("Deinit return code", return_code)
+
         return return_code
 
     def get_channel_paramters(self, slot, channel):

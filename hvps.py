@@ -15,7 +15,7 @@ class HVPS_Class:
         self.max_ramp_rate = max_ramp_rate
         self.hvps_systems_objects_list = []
         self.caen_system_info_list = caen_system_info_list
-
+        self.hvps_systems_objects_list = []
         self.init_all_hvps()
 
     def __del__(self):
@@ -23,6 +23,7 @@ class HVPS_Class:
 
     def init_all_hvps(self):
         for caen_system_info_dict in self.caen_system_info_list:
+            print("Going to INIT STUFFS")
             self.hvps_systems_objects_list.append(CC(caen_system_info_dict["system_type"],
                                                      caen_system_info_dict["hostname"],
                                                      caen_system_info_dict["username"],
@@ -35,6 +36,30 @@ class HVPS_Class:
     def deinit_all_hvps(self):
         for hvps_device in self.hvps_systems_objects_list:
             hvps_device.deinit()
+
+    def decode_chstatus(self, chstatus):
+        chstatus_dict = {'on': 0, 'rup': 0, 'rdown': 0, 'overcurrent': 0, 'overvoltage': 0, 'undervoltage': 0, 'ext_trip': 0, 'maxv': 0,
+                         'ext_disable': 0, 'int_trip': 0, 'calibration_error': 0, 'unplugged': 0, 'overvoltage_protection': 0,
+                         'power_fail': 0, 'temp_error': 0}
+
+#        if (chstatus & (1<<n)):  # Checks if bit n is set to 1
+        chstatus_dict['on'] = chstatus & (1<<0)  # bit 0
+        chstatus_dict['rup'] = chstatus & (1<<1)  # bit 1
+        chstatus_dict['rdown'] = chstatus & (1<<2)  # bit 2
+        chstatus_dict['overcurrent'] = chstatus & (1<<3)  # bit 3
+        chstatus_dict['overvoltage'] = chstatus & (1<<4)  # bit 4
+        chstatus_dict['undervoltage'] = chstatus & (1<<5)  # bit 5
+        chstatus_dict['ext_trip'] = chstatus & (1<<6)  # bit 6
+        chstatus_dict['maxv'] = chstatus & (1<<7)  # bit 7
+        chstatus_dict['ext_disable'] = chstatus & (1<<8)  # bit 8
+        chstatus_dict['int_trip'] = chstatus & (1<<9)  # bit 9
+        chstatus_dict['calibration_error'] = chstatus & (1<<10)  # bit 10
+        chstatus_dict['unplugged'] = chstatus & (1<<11)  # bit 11
+        chstatus_dict['overvoltage_protection'] = chstatus & (1<<13)  # bit 13
+        chstatus_dict['power_fail'] = chstatus & (1<<14)  # bit 14
+        chstatus_dict['temp_error'] = chstatus & (1<<15)  # bit 15
+
+        return chstatus_dict
 
     def get_object_entry_for_hvps_by_name(self, hvps_name):
         if len(self.hvps_systems_objects_list) == 1 and hvps_name is None:
@@ -72,6 +97,22 @@ class HVPS_Class:
             device_info_dict.update(hvps_entry.get_crate_info())  # combine dict's
             crate_info_list.append(device_info_dict)
         return crate_info_list
+
+    def get_all_channel_names(self):
+        full_list_of_channel_names = []
+        crate_info_list = self.get_all_crates_info()
+        print(crate_info_list)
+        device_and_channel_dict = {}
+        for my_crate in crate_info_list:
+            list_of_channel_names = []
+            print("Got here 1")
+            hvps_entry = self.get_object_entry_for_hvps_by_name(my_crate['device_name'])
+            for my_slot in range(0, my_crate['num_of_slots']):
+                print("Got here2")
+                list_of_channel_names.extend(hvps_entry.get_channel_names(my_slot, list(range(0, my_crate['num_of_channels']))))
+            device_and_channel_dict = {'device_name': my_crate['device_name'], 'channel_names': list_of_channel_names}
+            full_list_of_channel_names.append(device_and_channel_dict)
+        return full_list_of_channel_names
 
     def get_all_crate_channel_statuses(self, my_hpvs_crate):
         channel_status_list = []
