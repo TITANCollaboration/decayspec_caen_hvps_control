@@ -1,5 +1,5 @@
 from ctypes import c_int, c_float, c_void_p, c_char_p, c_char, c_ushort, pointer, cdll, cast, POINTER, byref
-import pprint
+from pprint import pprint
 import socket
 import time
 import sys
@@ -29,12 +29,12 @@ class CAEN_Controller:
             print("Or the IP address is improperly formatted")
         self.handle = 0
         self.handle = c_int()
-        print("INIT TIME!!")
+        print("Initilizing HVPS...")
         self.init()
 
     def check_return_code(self, return_code):
         if hex(return_code) != hex(0):
-            print("Problem communicating with HVPS, check SLOT # and Channel # : %s, ERROR code : %s" % (self.ip_address, hex(return_code)))
+            print("Problem communicating with HVPS, check SLOT # and Channel #, IP : %s, ERROR code : %s" % (self.ip_address, hex(return_code)))
             # print(cast(self.libcaenhvwrapper_so.CAENHV_GetError(self.handle), c_char_p).raw)  # this didn't work the first time, maybe i'll come back to it
             print("Calling Function:", sys._getframe(1).f_code.co_name)
             #return 0
@@ -50,18 +50,17 @@ class CAEN_Controller:
                                                                  self.username,
                                                                  self.password,
                                                                  pointer(self.handle))
+        print("Init Return Code:", return_code)
         self.check_return_code(return_code)
         print("Initialized Connection to : %s" % (self.hostname))
 
     def deinit(self):
-        print("Going to de-init!")
         # De-initilize the connection to the HVPS.
-        print("Handle :", self.handle)
         try:
             return_code = self.libcaenhvwrapper_so.CAENHV_DeinitSystem(self.handle)
         except:
             print("Something didn't go well with de-init'ing")
-        print("Deinit return code", return_code)
+        # print("Deinit return code", return_code)
 
         return return_code
 
@@ -132,23 +131,24 @@ class CAEN_Controller:
             all_channels_info_list.append(channel_info_dict)
         return all_channels_info_list
 
+    def set_channel_parameter(self, slot, channel, parameter, new_value):
+        # Set many common channel parameter : VSet, ISet, RUp, RDwn, PDwn, IMRange, Trip, all most all are float, except PDwn and IMRange (int)
+        c_channels_list = (c_ushort * 1)(*[channel])
+        c_new_value = c_float(new_value)
+        return_code = self.libcaenhvwrapper_so.CAENHV_SetChParam(self.handle, slot, parameter.encode('utf-8'), 1, c_channels_list, byref(c_new_value))
+        self.check_return_code(return_code)
+        return
+
     def set_channel_name(self, slot, channel, channel_name):
         #  Change the name of a single channel, I know the API allows multiple but I just don't care
         #  !! THIS IS UNTESTED UNTIL I FLIP THE HVPS TO REMOTE FROM LOCAL
         c_channels_list = (c_ushort * 1)(*[channel])
-
+        print("Channel Name:", channel_name)
         return_code = self.libcaenhvwrapper_so.CAENHV_SetChName(self.handle, slot, 1, c_channels_list, channel_name.encode('utf-8'))
         self.check_return_code(return_code)
         return
 
-    def set_channel_parameter(self, slot, channel, parameter, new_value):
-        #  !! THIS IS UNTESTED UNTIL I FLIP THE HVPS TO REMOTE FROM LOCAL
-        c_channels_list = (c_ushort * 1)(*[channel])
-        c_new_value = c_float(new_value)
 
-        return_code = self.libcaenhvwrapper_so.CAENHV_SetChParam(self.handle, slot, parameter.encode('utf-8'), 1, c_channels_list, c_new_value)
-        self.check_return_code(return_code)
-        return
 
     def get_crate_info(self):
         #  Used to get number of slots and channels in a crate.  It grabs other things as well but they aren't super useful

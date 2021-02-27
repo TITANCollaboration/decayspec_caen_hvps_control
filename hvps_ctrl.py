@@ -7,10 +7,11 @@
 
 import argparse
 import configparser
+from configobj import ConfigObj
 import sys
 import os
 from hvps import HVPS_Class
-import pprint
+from pprint import pprint
 import time
 
 
@@ -33,38 +34,57 @@ def getConfigEntry(config, heading, item, reqd=False, remove_spaces=True, defaul
 # Process config file using the configparser library
 # *************************************************************************************
 
+def process_config_file_test(config_file="hvps_test.cfg"):
+    config_dict = ConfigObj("hvps_test.cfg")
+    pprint(config_dict.keys())
+    for mykey in config_dict.keys():
+        if mykey.startswith('HVPS_'):
+            print(config_dict[mykey].keys())
+    return config_dict
 
 def process_config_file(config_file="hvps.cfg"):
     caen_system_info_list = []
+    caen_global_params_dict = {}
+
     config = configparser.RawConfigParser()
 
     if not os.path.exists(config_file):
         print("Could not read config file : %s" % (config_file))
         exit(1)
     config.read(config_file)
-    for channel_section in config.sections():
+    for section in config.sections():
         # Read in HVPS information
-        if channel_section == "GLOBAL":
-            print("Get Global Vars")
-        else:
+        if section == "GLOBAL":
+            caen_global_params_dict["default_slot"] = int(getConfigEntry(config, section, 'default_slot', reqd=False, remove_spaces=True))
+            caen_global_params_dict["max_ramp_rate"] = float(getConfigEntry(config, section, 'max_ramp_rate', reqd=False, remove_spaces=True))
+            caen_global_params_dict["max_bias_voltage"] = float(getConfigEntry(config, section, 'max_bias_voltage', reqd=True, remove_spaces=True))
             caen_system_info_dict = {}
-            caen_system_info_dict["device_name"] = channel_section
-            caen_system_info_dict["system_type"] = int(getConfigEntry(config, channel_section, 'caen_system_type', reqd=True, remove_spaces=True))
-            caen_system_info_dict["link_type"] = int(getConfigEntry(config, channel_section, 'caen_link_type', reqd=True, remove_spaces=True))
-            caen_system_info_dict["hostname"] = getConfigEntry(config, channel_section, 'caen_hostname', reqd=True, remove_spaces=True)
-            caen_system_info_dict["username"] = getConfigEntry(config, channel_section, 'caen_username', reqd=True, remove_spaces=True)
-            caen_system_info_dict["password"] = getConfigEntry(config, channel_section, 'caen_password', reqd=True, remove_spaces=True)
+            caen_system_info_dict["device_name"] = section
+            caen_system_info_dict["system_type"] = int(getConfigEntry(config, section, 'caen_system_type', reqd=True, remove_spaces=True))
+            caen_system_info_dict["link_type"] = int(getConfigEntry(config, section, 'caen_link_type', reqd=True, remove_spaces=True))
+            caen_system_info_dict["hostname"] = getConfigEntry(config, section, 'caen_hostname', reqd=True, remove_spaces=True)
+            caen_system_info_dict["username"] = getConfigEntry(config, section, 'caen_username', reqd=True, remove_spaces=True)
+            caen_system_info_dict["password"] = getConfigEntry(config, section, 'caen_password', reqd=True, remove_spaces=True)
             caen_system_info_list.append(caen_system_info_dict)
-        # else:
-        #     channel_num = int(getConfigEntry(config, channel_section, 'channel_num', reqd=True, remove_spaces=True))
-        #     enabled = getConfigEntry(config, channel_section, 'enabled', reqd=True, remove_spaces=True)
+
+        else:
+            enabled = getConfigEntry(config, section, 'enabled', reqd=True, remove_spaces=True)
+            if enabled == "True":
+                channel_num = int(getConfigEntry(config, section, 'channel_num', reqd=True, remove_spaces=True))
+                enabled = getConfigEntry(config, section, 'enabled', reqd=True, remove_spaces=True)
         #     detector_name = getConfigEntry(config, channel_section, 'detector_name', reqd=True, remove_spaces=True)
         #     detector_position = int(getConfigEntry(config, channel_section, 'detector_position', reqd=True, remove_spaces=True))
-        #     max_bias_voltage = int(getConfigEntry(config, channel_section, 'max_bias_voltage', reqd=True, remove_spaces=True))
-        #     ramp_rate = int(getConfigEntry(config, channel_section, 'ramp_rate', reqd=True, remove_spaces=True))
-        #     hvps_channel_list.append(HVPS_Channel(channel_num, enabled, detector_name, detector_position, max_bias_voltage, ramp_rate))
+                max_bias_voltage = float(getConfigEntry(config, section, 'max_bias_voltage', reqd=True, remove_spaces=True))
+                if max_bias_voltage > caen_global_params_dict["max_bias_voltage"]:
+                    print("Max Bias Voltage for channel", channel_num, "is greater than global max_bias_voltage allowed in config.")
+                    exit(1)
+                ramp_rate = float(getConfigEntry(config, section, 'ramp_rate', reqd=True, remove_spaces=True))
+                if ramp_rate > caen_global_params_dict["max_ramp_rate"]:
+                    print("Ramp rate for channel", channel_num, "is greater than global max_ramp_rate allowed in config.")
+                    exit(1)
+             #hvps_channel_list.append(HVPS_Channel(channel_num, enabled, detector_name, detector_position, max_bias_voltage, ramp_rate))
 
-    return caen_system_info_list
+    return caen_system_info_list, caen_global_params_dict
 
 
 def confirm_channel(chan_obj, action):
@@ -84,8 +104,17 @@ def confirm_channel(chan_obj, action):
         sys.exit(1)
 
 
-def process_cli_args(args, caen_system_info_list):
-    HVPS = HVPS_Class(caen_system_info_list)
+#def process_cli_args(args, caen_system_info_list, caen_global_params_dict):
+def process_cli_args(args, config_dict):
+    HVPS = []
+    if "default_slot" in config_dict.keys():
+        my_slot = int(config_dict["default_slot"])
+    else:
+        my_slot = args.slot_selected
+
+    for mykey in config_dict.keys():
+        if mykey.startswith('HVPS_'):
+            HVPS.append(HVPS_Class(config_dict[mykey]))
 
     if args.action == "status":
         chan_status = []
@@ -94,42 +123,56 @@ def process_cli_args(args, caen_system_info_list):
             args.channel_selected = "ALL"
 
         if args.channel_selected.upper() == "ALL":
-            pprint.pprint(HVPS.status_all_channels(args.hvps_name))
+            HVPS[0].status_all_channels(args.hvps_name)
         else:
-            pprint.pprint(HVPS.status_channel(args.hvps_name, int(args.slot_selected), int(args.channel_selected)))
+            HVPS[0].status_channel(args.hvps_name, my_slot, int(args.channel_selected))
     elif args.action == "bias":
         #pprint.pprint(HVPS.get_channel_parameters(args.hvps_name, int(args.slot_selected), int(args.channel_selected)))
         if args.bias_voltage is None:
             print("Must specify a BIAS voltage via --bias_voltage")
             exit(1)
-        elif args.channel_selected is None or args.slot_selected is None:
+        elif args.channel_selected is None:
             print("Must specify --slot and --channel")
             exit(1)
         else:
-            HVPS.bias_channel(args.hvps_name, int(args.slot_selected), int(args.channel_selected), int(args.bias_voltage))
+            HVPS[0].bias_channel(args.hvps_name, my_slot, int(args.channel_selected), int(args.bias_voltage))
 
     elif args.action == "unbias":
-        if args.channel_selected is None or args.slot_selected is None:
+        if args.channel_selected is None:
             print("Must specify --slot and --channel")
         else:
-            HVPS.unbias_channel(args.hvps_name, int(args.slot_selected), int(args.channel_selected))
-    del HVPS
-    print("Time 2")
-    HVPS = HVPS_Class(caen_system_info_list)
+            HVPS[0].unbias_channel(args.hvps_name, my_slot, int(args.channel_selected))
+    elif args.action == "set_param":
+        if args.channel_selected is None:
+            print("Must specify --slot and --channel")
+        else:
+            HVPS[0].set_channel_param(args.hvps_name, my_slot, int(args.channel_selected), args.param, args.param_value)
+    elif args.action == "set_name":
+        if args.channel_selected is None:
+            print("Must specify --slot and --channel")
+        else:
+            HVPS[0].set_channel_name(args.hvps_name, my_slot, int(args.channel_selected), "j1")
+    del HVPS[0]
+    #print("Time 2")  # Uncommented this and the next line to try init'ing again.  This should work if CAEN ever fixes their CApi which they promised back in Nov2020
+    #HVPS = HVPS_Class(caen_system_info_list)
 
     return
 
 
 def main():
-    parser = argparse.ArgumentParser(description='HVPS Controller', usage='%(prog)s --action [bias, unbias, status] --channel [channel num]')
+    parser = argparse.ArgumentParser(description='HVPS Controller', usage='%(prog)s --action [bias, unbias, status, set_name] --channel [channel num]')
     parser.add_argument('--hvps_name', dest='hvps_name', default=None, required=False)
 
-    parser.add_argument('--action', choices=('bias', 'unbias', 'status', 'test'), required=False)
+    parser.add_argument('--action', choices=('bias', 'unbias', 'status', 'test', 'set_param'), required=False)
 
+    parser.add_argument('--param', dest='param', choices=('ISet', 'RUp', 'RDwn', 'PDwn', 'IMRange', 'Trip'), required=False, default=None,
+                        help="Specify parameter to modify for channel, must specify with --action set_param")
+    parser.add_argument('--param_value', dest='param_value', required=False, type=int, default=None,
+                        help="Specify parameter value, must specify --action set_param and --param")
     parser.add_argument('--bias_voltage', dest='bias_voltage', type=int, required=False, default=None,
                         help="Specify new bias voltage for a channel")
 
-    parser.add_argument('--slot', dest='slot_selected', required=False, default=None,
+    parser.add_argument('--slot', dest='slot_selected', type=int, required=False, default=None,
                         help="Specify slot to take action against")
 
     parser.add_argument('--channel', dest='channel_selected', required=False, default=None,
@@ -142,9 +185,12 @@ def main():
 
     parser.set_defaults(config_file="hvps.cfg")
     args, unknown = parser.parse_known_args()
-    print(args)
-    caen_system_info_list = process_config_file(args.config_file)
-    hvps_channel_action = process_cli_args(args, caen_system_info_list)
+    # print(args)
+    config_dict = process_config_file_test(args.config_file)
+
+    #caen_system_info_list, caen_global_params_dict = process_config_file(args.config_file)
+    #hvps_channel_action = process_cli_args(args, caen_system_info_list, caen_global_params_dict)
+    process_cli_args(args, config_dict)
 
 
 if __name__ == "__main__":
