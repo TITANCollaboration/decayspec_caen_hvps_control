@@ -75,6 +75,7 @@ class HVPS_Class:
     def set_channel_param(self, hvps_name, slot, channel, param, param_value):
         # Probably need to turn channel on but will worry about that in a bit
         hvps_entry = self.get_object_entry_for_hvps_by_name(hvps_name)
+        print("Got here!!!")
         print("DEVICE:", hvps_entry.device_name, " CHANNEL:", channel, "SLOT:", slot, "Parameter:", param, "=", param_value)
         hvps_entry.set_channel_parameter(slot, channel, param, param_value)
 
@@ -102,7 +103,7 @@ class HVPS_Class:
         channel_status_list = []
         hvps_entry = self.get_object_entry_for_hvps_by_name(hvps_name)
         channel_status_list.append(hvps_entry.get_all_info_for_channels(slot, [channel]))
-        self.show_channel_status(channel_status_list)
+        #self.show_channel_status(channel_status_list)
         return channel_status_list
 
     def set_channel_name(self, hvps_name, slot, channel, channel_name):

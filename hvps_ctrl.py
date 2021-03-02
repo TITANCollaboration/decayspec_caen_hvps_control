@@ -36,10 +36,10 @@ def getConfigEntry(config, heading, item, reqd=False, remove_spaces=True, defaul
 
 def process_config_file_test(config_file="hvps_test.cfg"):
     config_dict = ConfigObj("hvps_test.cfg")
-    pprint(config_dict.keys())
-    for mykey in config_dict.keys():
-        if mykey.startswith('HVPS_'):
-            print(config_dict[mykey].keys())
+    #pprint(config_dict.keys())
+    #for mykey in config_dict.keys():
+    #    if mykey.startswith('HVPS_'):
+    #        print(config_dict[mykey].keys())
     return config_dict
 
 def process_config_file(config_file="hvps.cfg"):
@@ -104,8 +104,71 @@ def confirm_channel(chan_obj, action):
         sys.exit(1)
 
 
-#def process_cli_args(args, caen_system_info_list, caen_global_params_dict):
+def find_channel_in_config(channel, config_dict_hvps):
+    channel_entry = None
+    pprint(config_dict_hvps)
+    for my_channel_key in config_dict_hvps.keys():
+        if my_channel_key.startswith('CH_'):
+            if (config_dict_hvps[my_channel_key]['channel_num'] == channel) and config_dict_hvps[my_channel_key]['Enabled'].upper() == "True".upper():
+                channel_entry = config_dict_hvps[my_channel_key]
+    return channel_entry
+
+
+def compare_voltage(channel, my_new_bias_voltage, ramp_rate, HVPS, my_slot, max_ramp_rate):
+    perform_bias = False
+    new_bias_voltage = int(my_new_bias_voltage)
+    channel_status_list = HVPS[0].status_channel(None, my_slot, int(channel))
+    current_voltage = int(next(item for item in channel_status_list[0][0]['chan_info'] if item['parameter'] == 'VSet')['value'])
+
+    if current_voltage >= int(new_bias_voltage):
+        print("Channel:", channel, "is already set to bias voltage:", current_voltage)
+        exit(1)
+    else:
+        print("You are about to change the BIAS voltage for :")
+        print("Channel:", channel)
+        print("Current BIAS voltage:", current_voltage)
+        print("New BIAS voltage:", new_bias_voltage)
+        print("At voltage ramp rate (V/sec):", max_ramp_rate)
+        input_response = input("Please Confirm This Change (y/n) : ")
+        if input_response == 'y':
+            perform_bias = True
+    return perform_bias
+
+
+def get_max_voltage_ramp_rate(config_dict, channel_entry):
+    my_ramp_rate = 0
+    if int(channel_entry['ramp_rate']) < int(config_dict['max_ramp_rate']):
+        my_ramp_rate = int(channel_entry['ramp_rate'])
+    else:
+        my_ramp_rate = int(config_dict['max_ramp_rate'])
+    return int(my_ramp_rate)
+
+
+def bias(args, config_dict, HVPS, my_slot, default_hvps_key):
+    max_ramp_rate = 0
+    if (args.bias_voltage is None) and (args.channel_selected is not None):
+        channel_entry = find_channel_in_config(args.channel_selected, config_dict[default_hvps_key])
+        if channel_entry is not None:
+            print(channel_entry)
+            max_ramp_rate = get_max_voltage_ramp_rate(config_dict, channel_entry)
+            if compare_voltage(channel_entry['channel_num'], channel_entry['max_bias_voltage'], max_ramp_rate, HVPS, my_slot, max_ramp_rate) is True:
+                HVPS[0].set_channel_param(args.hvps_name, my_slot, int(args.channel_selected), 'RUp', max_ramp_rate)
+                time.sleep(1)
+                HVPS[0].bias_channel(args.hvps_name, my_slot, int(args.channel_selected), int(channel_entry['max_bias_voltage']))
+
+        else:
+            print("Must specify a BIAS voltage via --bias_voltage or put an entry for the channel in the config file and ensure Enabled is True")
+            exit(1)
+    elif args.channel_selected is None:
+        print("Must specify --channel")
+        exit(1)
+    else:
+
+        HVPS[0].bias_channel(args.hvps_name, my_slot, int(args.channel_selected), int(args.bias_voltage))
+
+
 def process_cli_args(args, config_dict):
+    default_hvps_key = None
     HVPS = []
     if "default_slot" in config_dict.keys():
         my_slot = int(config_dict["default_slot"])
@@ -114,6 +177,7 @@ def process_cli_args(args, config_dict):
 
     for mykey in config_dict.keys():
         if mykey.startswith('HVPS_'):
+            default_hvps_key = mykey
             HVPS.append(HVPS_Class(config_dict[mykey]))
 
     if args.action == "status":
@@ -125,33 +189,25 @@ def process_cli_args(args, config_dict):
         if args.channel_selected.upper() == "ALL":
             HVPS[0].status_all_channels(args.hvps_name)
         else:
-            HVPS[0].status_channel(args.hvps_name, my_slot, int(args.channel_selected))
+            channel_status_list = HVPS[0].status_channel(args.hvps_name, my_slot, int(args.channel_selected))
+            HVPS[0].show_channel_status(channel_status_list)
     elif args.action == "bias":
-        #pprint.pprint(HVPS.get_channel_parameters(args.hvps_name, int(args.slot_selected), int(args.channel_selected)))
-        if args.bias_voltage is None:
-            print("Must specify a BIAS voltage via --bias_voltage")
-            exit(1)
-        elif args.channel_selected is None:
-            print("Must specify --slot and --channel")
-            exit(1)
-        else:
-            HVPS[0].bias_channel(args.hvps_name, my_slot, int(args.channel_selected), int(args.bias_voltage))
-
+        bias(args, config_dict, HVPS, my_slot, default_hvps_key)
     elif args.action == "unbias":
         if args.channel_selected is None:
-            print("Must specify --slot and --channel")
+            print("Must specify --channel")
         else:
             HVPS[0].unbias_channel(args.hvps_name, my_slot, int(args.channel_selected))
     elif args.action == "set_param":
         if args.channel_selected is None:
-            print("Must specify --slot and --channel")
+            print("Must specify --channel")
         else:
             HVPS[0].set_channel_param(args.hvps_name, my_slot, int(args.channel_selected), args.param, args.param_value)
-    elif args.action == "set_name":
-        if args.channel_selected is None:
-            print("Must specify --slot and --channel")
-        else:
-            HVPS[0].set_channel_name(args.hvps_name, my_slot, int(args.channel_selected), "j1")
+    #elif args.action == "set_name":
+    #    if args.channel_selected is None:
+    #        print("Must specify --slot and --channel")
+    #    else:
+    #        HVPS[0].set_channel_name(args.hvps_name, my_slot, int(args.channel_selected), "j1")
     del HVPS[0]
     #print("Time 2")  # Uncommented this and the next line to try init'ing again.  This should work if CAEN ever fixes their CApi which they promised back in Nov2020
     #HVPS = HVPS_Class(caen_system_info_list)
@@ -163,7 +219,7 @@ def main():
     parser = argparse.ArgumentParser(description='HVPS Controller', usage='%(prog)s --action [bias, unbias, status, set_name] --channel [channel num]')
     parser.add_argument('--hvps_name', dest='hvps_name', default=None, required=False)
 
-    parser.add_argument('--action', choices=('bias', 'unbias', 'status', 'test', 'set_param'), required=False)
+    parser.add_argument('--action', choices=('bias', 'unbias', 'status', 'bias_all', 'unbias_all', 'set_param'), required=False)
 
     parser.add_argument('--param', dest='param', choices=('ISet', 'RUp', 'RDwn', 'PDwn', 'IMRange', 'Trip'), required=False, default=None,
                         help="Specify parameter to modify for channel, must specify with --action set_param")

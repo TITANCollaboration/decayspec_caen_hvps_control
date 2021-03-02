@@ -29,7 +29,7 @@ class CAEN_Controller:
             print("Or the IP address is improperly formatted")
         self.handle = 0
         self.handle = c_int()
-        print("Initilizing HVPS...")
+        #print("Initilizing HVPS...")
         self.init()
 
     def check_return_code(self, return_code):
@@ -50,7 +50,7 @@ class CAEN_Controller:
                                                                  self.username,
                                                                  self.password,
                                                                  pointer(self.handle))
-        print("Init Return Code:", return_code)
+        #print("Init Return Code:", return_code)
         self.check_return_code(return_code)
         print("Initialized Connection to : %s" % (self.hostname))
 
