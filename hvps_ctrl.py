@@ -10,13 +10,16 @@ import configparser
 from configobj import ConfigObj
 import sys
 import os
-from hvps import HVPS_Class
 from pprint import pprint
 import time
+
+from hvps import HVPS_Class  # Class that contains high level wrapper functions for the HVPS,
+
 
 
 def getConfigEntry(config, heading, item, reqd=False, remove_spaces=True, default_val=''):
     #  Just a helper function to process config file lines, strip out white spaces and check if requred etc.
+    # only used for the now defunct process_config_file
     if config.has_option(heading, item):
         if remove_spaces:
             config_item = config.get(heading, item).replace(" ", "")
@@ -34,15 +37,19 @@ def getConfigEntry(config, heading, item, reqd=False, remove_spaces=True, defaul
 # Process config file using the configparser library
 # *************************************************************************************
 
-def process_config_file_test(config_file="hvps_test.cfg"):
-    config_dict = ConfigObj("hvps_test.cfg")
+def process_config_file_configobj(config_file="hvps_test.cfg"):
+    # process_config_file_configobj: Using ConfigObj to process config file into nested dict's
+    config_dict = ConfigObj("hvps_test.cfg")  # Change this to config_file after testing
+
     #pprint(config_dict.keys())
     #for mykey in config_dict.keys():
     #    if mykey.startswith('HVPS_'):
     #        print(config_dict[mykey].keys())
     return config_dict
 
+
 def process_config_file(config_file="hvps.cfg"):
+    # I don't believe I will be using this, the ConfigObj code seems a little more streamlined
     caen_system_info_list = []
     caen_global_params_dict = {}
 
@@ -88,6 +95,7 @@ def process_config_file(config_file="hvps.cfg"):
 
 
 def confirm_channel(chan_obj, action):
+    # confirm_channel: Prompt user to confirm a change to the voltage applied to a channel, requires a 'yes' or 'no' answer
     print("-------------------------------------")
     print("Channel Number : %i " % chan_obj.channel_num)
     print("Detector Name : %s" % chan_obj.detector_name)
@@ -105,25 +113,29 @@ def confirm_channel(chan_obj, action):
 
 
 def find_channel_in_config(channel, config_dict_hvps):
+    # find_channel_in_config: Checks that there is a config entry for the channel before taking action on it and confirms if the channel is enabled
     channel_entry = None
     pprint(config_dict_hvps)
     for my_channel_key in config_dict_hvps.keys():
         if my_channel_key.startswith('CH_'):
-            if (config_dict_hvps[my_channel_key]['channel_num'] == channel) and config_dict_hvps[my_channel_key]['Enabled'].upper() == "True".upper():
+            if (config_dict_hvps[my_channel_key]['channel_num'] == channel) and config_dict_hvps[my_channel_key]['Enabled'].upper() == "True".upper():  # If channel exists in config file AND it is marked as ENABLED
                 channel_entry = config_dict_hvps[my_channel_key]
-    return channel_entry
+    return channel_entry  # Return the dict for the specified channel
 
 
 def compare_voltage(channel, my_new_bias_voltage, ramp_rate, HVPS, my_slot, max_ramp_rate):
+    # compare_voltage: Check what the current voltage of the channel and determine if it needs to be further biased on
+    #                  user request.
     perform_bias = False
     new_bias_voltage = int(my_new_bias_voltage)
     channel_status_list = HVPS[0].status_channel(None, my_slot, int(channel))
+    # Iterate over the status of channels until reaching the VSet parameter we're looking for which is the current voltage
     current_voltage = int(next(item for item in channel_status_list[0][0]['chan_info'] if item['parameter'] == 'VSet')['value'])
 
-    if current_voltage >= int(new_bias_voltage):
+    if current_voltage >= int(new_bias_voltage):  # Check if voltage is already the requested voltage
         print("Channel:", channel, "is already set to bias voltage:", current_voltage)
         exit(1)
-    else:
+    else:  # If it is not then we will prompt to confirm the change
         print("You are about to change the BIAS voltage for :")
         print("Channel:", channel)
         print("Current BIAS voltage:", current_voltage)
@@ -136,6 +148,9 @@ def compare_voltage(channel, my_new_bias_voltage, ramp_rate, HVPS, my_slot, max_
 
 
 def get_max_voltage_ramp_rate(config_dict, channel_entry):
+    # get_max_voltage_ramp_rate: Pull out the Max Ramp Rate (RUp) from the config file for a channel
+    #                            Also go ahead and check that the ramp rate set doesn't exceed the
+    #                            max set in the config file
     my_ramp_rate = 0
     if int(channel_entry['ramp_rate']) < int(config_dict['max_ramp_rate']):
         my_ramp_rate = int(channel_entry['ramp_rate'])
@@ -145,29 +160,30 @@ def get_max_voltage_ramp_rate(config_dict, channel_entry):
 
 
 def bias(args, config_dict, HVPS, my_slot, default_hvps_key):
+    # bias: Runs checks and calls appropriate functions to bias a channel
     max_ramp_rate = 0
-    if (args.bias_voltage is None) and (args.channel_selected is not None):
-        channel_entry = find_channel_in_config(args.channel_selected, config_dict[default_hvps_key])
+    if (args.bias_voltage is None) and (args.channel_selected is not None):  # If we should go with the default voltage set in the config file
+        channel_entry = find_channel_in_config(args.channel_selected, config_dict[default_hvps_key])  # Get the config entry for channel
         if channel_entry is not None:
             print(channel_entry)
-            max_ramp_rate = get_max_voltage_ramp_rate(config_dict, channel_entry)
-            if compare_voltage(channel_entry['channel_num'], channel_entry['max_bias_voltage'], max_ramp_rate, HVPS, my_slot, max_ramp_rate) is True:
-                HVPS[0].set_channel_param(args.hvps_name, my_slot, int(args.channel_selected), 'RUp', max_ramp_rate)
-                time.sleep(1)
-                HVPS[0].bias_channel(args.hvps_name, my_slot, int(args.channel_selected), int(channel_entry['max_bias_voltage']))
-
+            max_ramp_rate = get_max_voltage_ramp_rate(config_dict, channel_entry)  # Get the max volatage ramp rate RUp
+            if compare_voltage(channel_entry['channel_num'], channel_entry['max_bias_voltage'], max_ramp_rate, HVPS, my_slot, max_ramp_rate) is True:  # Check if we need to actually change the voltage or if it is already set
+                HVPS[0].set_channel_param(args.hvps_name, my_slot, int(args.channel_selected), 'RUp', max_ramp_rate)  # Ensure the ramp up value is set to something safe
+                time.sleep(1)  # Sleep for a moment to make sure the setting has taken effect
+                HVPS[0].bias_channel(args.hvps_name, my_slot, int(args.channel_selected), int(channel_entry['max_bias_voltage']))  # Bias the channel
         else:
             print("Must specify a BIAS voltage via --bias_voltage or put an entry for the channel in the config file and ensure Enabled is True")
             exit(1)
     elif args.channel_selected is None:
         print("Must specify --channel")
         exit(1)
-    else:
-
-        HVPS[0].bias_channel(args.hvps_name, my_slot, int(args.channel_selected), int(args.bias_voltage))
+    #else:  # I think if I want this functionality I need to expand out the checks on the channel
+    #    HVPS[0].bias_channel(args.hvps_name, my_slot, int(args.channel_selected), int(args.bias_voltage))
+    return
 
 
 def process_cli_args(args, config_dict):
+    # process_cli_args: Mostly does just that, processes command line arguements and runs appropriate tests 
     default_hvps_key = None
     HVPS = []
     if "default_slot" in config_dict.keys():
@@ -242,7 +258,7 @@ def main():
     parser.set_defaults(config_file="hvps.cfg")
     args, unknown = parser.parse_known_args()
     # print(args)
-    config_dict = process_config_file_test(args.config_file)
+    config_dict = process_config_file_configobj(args.config_file)
 
     #caen_system_info_list, caen_global_params_dict = process_config_file(args.config_file)
     #hvps_channel_action = process_cli_args(args, caen_system_info_list, caen_global_params_dict)
