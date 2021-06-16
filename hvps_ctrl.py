@@ -38,19 +38,23 @@ def process_config_file_configobj(config_file="hvps.cfg"):
     return config_dict
 
 
-def confirm_channel(chan_obj, action):
+def confirm_channel(HVPS, my_slot, chan_obj, action, new_voltage):
     # confirm_channel: Prompt user to confirm a change to the voltage applied to a channel, requires a 'yes' or 'no' answer
+    channel_status_list = HVPS[0].status_channel(None, my_slot, int(chan_obj['channel_num']))
+        # Iterate over the status of channels until reaching the VSet parameter we're looking for which is the current voltage
+    current_voltage = int(next(item for item in channel_status_list[0][0]['chan_info'] if item['parameter'] == 'VSet')['value'])
     print("-------------------------------------")
-    print("Channel Number : %i " % chan_obj.channel_num)
-    print("Detector Name : %s" % chan_obj.detector_name)
-    print("Detector Position : %i" % chan_obj.detector_position)
-    print("MAX BIAS VOLTAGE : %i V" % chan_obj.max_bias_voltage)
-    print("RAMP RATE : %i V/sec" % chan_obj.ramp_rate)
+    print("CHANNEL NUMBER : %i " % int(chan_obj['channel_num']))
+    print("DETECTOR NAME : %s" % chan_obj['detector_name'])
+    #print("Detector Position : %i" % chan_obj.detector_position)
+    print("MAX BIAS VOLTAGE : %i V" % int(chan_obj['max_bias_voltage']))
+    print("RAMP RATE : %i V/sec" % int(chan_obj['ramp_rate']))
+    print("CURRNET BIAS VOLTAGE : ", current_voltage)
+    print("** NEW BIAS VOLTAGE : ", new_voltage)
     print("-------------------------------------")
-    print("Current status : ")  # Put some current status here..., will need to pass this in
-    user_confirmation_input = input("Are you sure you want to %s this channel? YES/NO : " % action.upper())
-    if user_confirmation_input.upper() == "YES":
-        print("Ok, Let's do it!!")
+    user_confirmation_input = input("Are you sure you want to %s this channel? (y/n) : " % action.upper())
+    if user_confirmation_input.upper() == "Y":
+        return True
     else:
         print("Could not confirm action, exiting ...")
         sys.exit(1)
@@ -62,7 +66,7 @@ def find_channel_in_config(channel, config_dict_hvps):
     #pprint(config_dict_hvps)
     for my_channel_key in config_dict_hvps.keys():
         if my_channel_key.startswith('CH_'):
-            if (config_dict_hvps[my_channel_key]['channel_num'] == channel) and config_dict_hvps[my_channel_key]['Enabled'].upper() == "True".upper():  # If channel exists in config file AND it is marked as ENABLED
+            if (config_dict_hvps[my_channel_key]['channel_num'] == str(channel)) and config_dict_hvps[my_channel_key]['Enabled'].upper() == "True".upper():  # If channel exists in config file AND it is marked as ENABLED
                 channel_entry = config_dict_hvps[my_channel_key]
     return channel_entry  # Return the dict for the specified channel
 
@@ -89,14 +93,7 @@ def compare_voltage(channel_entry, config_dict, my_new_bias_voltage, ramp_rate, 
         print("!! Channel:", channel, "is already set to bias voltage:", current_voltage)
         exit(1)
     else:  # If it is not then we will prompt to confirm the change
-        print("You are about to change the BIAS voltage for :")
-        print("Channel:", channel)
-        print("Current BIAS voltage:", current_voltage)
-        print("New BIAS voltage:", new_bias_voltage)
-        print("At voltage ramp rate (V/sec):", max_ramp_rate)
-        input_response = input("Please confirm this change (y/n) : ")
-        if input_response == 'y':
-            perform_bias = True
+        perform_bias = confirm_channel(HVPS, my_slot, channel_entry, "BIAS", my_new_bias_voltage)
     return perform_bias
 
 
@@ -110,6 +107,15 @@ def get_max_voltage_ramp_rate(config_dict, channel_entry):
     else:
         my_ramp_rate = int(config_dict['max_ramp_rate'])
     return int(my_ramp_rate)
+
+
+def unbias_channel(HVPS, hvps_name, my_slot, channel_selected, config_dict, default_hvps_key):
+    # unbias_channel: Drop VSet to 0 and also ensure RDwn (ramp down) voltage is set correctly
+    channel_entry = find_channel_in_config(channel_selected, config_dict[default_hvps_key])  # Get the config entry for channel
+    max_ramp_rate = get_max_voltage_ramp_rate(config_dict, channel_entry)
+    if confirm_channel(HVPS, my_slot, channel_entry, "UNBIAS", 0):
+        HVPS[0].set_channel_param(hvps_name, my_slot, channel_selected, 'RDwn', max_ramp_rate)  # Ensure the ramp up value is set to something safe
+        HVPS[0].unbias_channel(hvps_name, my_slot, channel_selected)
 
 
 def bias(args, config_dict, HVPS, my_slot, default_hvps_key):
@@ -126,6 +132,7 @@ def bias(args, config_dict, HVPS, my_slot, default_hvps_key):
             max_ramp_rate = get_max_voltage_ramp_rate(config_dict, channel_entry)  # Get the max volatage ramp rate RUp
             if compare_voltage(channel_entry, config_dict, my_new_bias_voltage, max_ramp_rate, HVPS, my_slot, max_ramp_rate) is True:  # Check if we need to actually change the voltage or if it is already set
                 HVPS[0].set_channel_param(args.hvps_name, my_slot, int(args.channel_selected), 'RUp', max_ramp_rate)  # Ensure the ramp up value is set to something safe
+                HVPS[0].set_channel_param(args.hvps_name, my_slot, int(args.channel_selected), 'RDwn', max_ramp_rate)  # Ensure the ramp up value is set to something safe
                 HVPS[0].set_channel_param(args.hvps_name, my_slot, int(args.channel_selected), 'ISet', 0)  # Ensure we have 0 current set
                 time.sleep(1)  # Sleep for a moment to make sure the setting has taken effect
                 HVPS[0].bias_channel(args.hvps_name, my_slot, int(args.channel_selected), int(my_new_bias_voltage))  # Bias the channel
@@ -174,7 +181,8 @@ def process_cli_args(args, config_dict):
         if args.channel_selected is None:
             print("Must specify --channel")
         else:
-            HVPS[0].unbias_channel(args.hvps_name, my_slot, int(args.channel_selected))
+            unbias_channel(HVPS, args.hvps_name, my_slot, int(args.channel_selected), config_dict, default_hvps_key)
+
     elif args.action == "set_param":
         if args.channel_selected is None:
             print("Must specify --channel")
