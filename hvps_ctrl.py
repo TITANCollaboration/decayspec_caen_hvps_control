@@ -3,95 +3,39 @@
 #   Created: March 23 2020 - During the great plague
 #   Purpose: Provide a wrapper for CAEN's C library to control the CAEN HVPS which biases
 #            the HPGe's (8pi's and ULGe)
+#   CAEN manaul and c-api : https://www.caen.it/products/caen-hv-wrapper-library/
 # *************************************************************************************
 
+
 import argparse
-import configparser
+# import configparser
 from configobj import ConfigObj
 import sys
 import os
 from pprint import pprint
 import time
+from os.path import exists
 
 from hvps import HVPS_Class  # Class that contains high level wrapper functions for the HVPS,
 
-
-
-def getConfigEntry(config, heading, item, reqd=False, remove_spaces=True, default_val=''):
-    #  Just a helper function to process config file lines, strip out white spaces and check if requred etc.
-    # only used for the now defunct process_config_file
-    if config.has_option(heading, item):
-        if remove_spaces:
-            config_item = config.get(heading, item).replace(" ", "")
-        else:
-            config_item = config.get(heading, item)
-    elif reqd:
-        print("The required config file setting \'%s\' under [%s] is missing") % (item, heading)
-        sys.exit(1)
-    else:
-        config_item = default_val
-    return config_item
 
 # *************************************************************************************
 # process_config_file:
 # Process config file using the configparser library
 # *************************************************************************************
 
-def process_config_file_configobj(config_file="hvps_test.cfg"):
+def process_config_file_configobj(config_file="hvps.cfg"):
     # process_config_file_configobj: Using ConfigObj to process config file into nested dict's
-    config_dict = ConfigObj("hvps_test.cfg")  # Change this to config_file after testing
-
-    #pprint(config_dict.keys())
+    if exists(config_file):
+        config_dict = ConfigObj(config_file)  # Change this to config_file after testing
+    else:
+        print("Could not open config file:", config_file)
+        exit(1)
+    #pprint(config_dict)
     #for mykey in config_dict.keys():
     #    if mykey.startswith('HVPS_'):
     #        print(config_dict[mykey].keys())
     return config_dict
-
-
-def process_config_file(config_file="hvps.cfg"):
-    # I don't believe I will be using this, the ConfigObj code seems a little more streamlined
-    caen_system_info_list = []
-    caen_global_params_dict = {}
-
-    config = configparser.RawConfigParser()
-
-    if not os.path.exists(config_file):
-        print("Could not read config file : %s" % (config_file))
-        exit(1)
-    config.read(config_file)
-    for section in config.sections():
-        # Read in HVPS information
-        if section == "GLOBAL":
-            caen_global_params_dict["default_slot"] = int(getConfigEntry(config, section, 'default_slot', reqd=False, remove_spaces=True))
-            caen_global_params_dict["max_ramp_rate"] = float(getConfigEntry(config, section, 'max_ramp_rate', reqd=False, remove_spaces=True))
-            caen_global_params_dict["max_bias_voltage"] = float(getConfigEntry(config, section, 'max_bias_voltage', reqd=True, remove_spaces=True))
-            caen_system_info_dict = {}
-            caen_system_info_dict["device_name"] = section
-            caen_system_info_dict["system_type"] = int(getConfigEntry(config, section, 'caen_system_type', reqd=True, remove_spaces=True))
-            caen_system_info_dict["link_type"] = int(getConfigEntry(config, section, 'caen_link_type', reqd=True, remove_spaces=True))
-            caen_system_info_dict["hostname"] = getConfigEntry(config, section, 'caen_hostname', reqd=True, remove_spaces=True)
-            caen_system_info_dict["username"] = getConfigEntry(config, section, 'caen_username', reqd=True, remove_spaces=True)
-            caen_system_info_dict["password"] = getConfigEntry(config, section, 'caen_password', reqd=True, remove_spaces=True)
-            caen_system_info_list.append(caen_system_info_dict)
-
-        else:
-            enabled = getConfigEntry(config, section, 'enabled', reqd=True, remove_spaces=True)
-            if enabled == "True":
-                channel_num = int(getConfigEntry(config, section, 'channel_num', reqd=True, remove_spaces=True))
-                enabled = getConfigEntry(config, section, 'enabled', reqd=True, remove_spaces=True)
-        #     detector_name = getConfigEntry(config, channel_section, 'detector_name', reqd=True, remove_spaces=True)
-        #     detector_position = int(getConfigEntry(config, channel_section, 'detector_position', reqd=True, remove_spaces=True))
-                max_bias_voltage = float(getConfigEntry(config, section, 'max_bias_voltage', reqd=True, remove_spaces=True))
-                if max_bias_voltage > caen_global_params_dict["max_bias_voltage"]:
-                    print("Max Bias Voltage for channel", channel_num, "is greater than global max_bias_voltage allowed in config.")
-                    exit(1)
-                ramp_rate = float(getConfigEntry(config, section, 'ramp_rate', reqd=True, remove_spaces=True))
-                if ramp_rate > caen_global_params_dict["max_ramp_rate"]:
-                    print("Ramp rate for channel", channel_num, "is greater than global max_ramp_rate allowed in config.")
-                    exit(1)
-             #hvps_channel_list.append(HVPS_Channel(channel_num, enabled, detector_name, detector_position, max_bias_voltage, ramp_rate))
-
-    return caen_system_info_list, caen_global_params_dict
 
 
 def confirm_channel(chan_obj, action):
@@ -115,7 +59,7 @@ def confirm_channel(chan_obj, action):
 def find_channel_in_config(channel, config_dict_hvps):
     # find_channel_in_config: Checks that there is a config entry for the channel before taking action on it and confirms if the channel is enabled
     channel_entry = None
-    pprint(config_dict_hvps)
+    #pprint(config_dict_hvps)
     for my_channel_key in config_dict_hvps.keys():
         if my_channel_key.startswith('CH_'):
             if (config_dict_hvps[my_channel_key]['channel_num'] == channel) and config_dict_hvps[my_channel_key]['Enabled'].upper() == "True".upper():  # If channel exists in config file AND it is marked as ENABLED
@@ -123,17 +67,26 @@ def find_channel_in_config(channel, config_dict_hvps):
     return channel_entry  # Return the dict for the specified channel
 
 
-def compare_voltage(channel, my_new_bias_voltage, ramp_rate, HVPS, my_slot, max_ramp_rate):
+def compare_voltage(channel_entry, config_dict, my_new_bias_voltage, ramp_rate, HVPS, my_slot, max_ramp_rate):
     # compare_voltage: Check what the current voltage of the channel and determine if it needs to be further biased on
     #                  user request.
+    max_channel_bias_voltage = channel_entry['max_bias_voltage']
+    max_global_bias_voltage = config_dict['max_bias_voltage']
+    channel = channel_entry['channel_num']
     perform_bias = False
     new_bias_voltage = int(my_new_bias_voltage)
     channel_status_list = HVPS[0].status_channel(None, my_slot, int(channel))
     # Iterate over the status of channels until reaching the VSet parameter we're looking for which is the current voltage
     current_voltage = int(next(item for item in channel_status_list[0][0]['chan_info'] if item['parameter'] == 'VSet')['value'])
 
-    if current_voltage >= int(new_bias_voltage):  # Check if voltage is already the requested voltage
-        print("Channel:", channel, "is already set to bias voltage:", current_voltage)
+    if int(new_bias_voltage) > int(max_channel_bias_voltage):
+        print("!! Can not exceed this channels maximum BIAS voltage set in the config file:", max_channel_bias_voltage)
+        exit(1)
+    elif int(new_bias_voltage) > int(max_global_bias_voltage):
+        print("!! Can not exceed this global maximum BIAS voltage set in the config file:", max_global_bias_voltage)
+        exit(1)
+    if current_voltage == int(new_bias_voltage):  # Check if voltage is already the requested voltage
+        print("!! Channel:", channel, "is already set to bias voltage:", current_voltage)
         exit(1)
     else:  # If it is not then we will prompt to confirm the change
         print("You are about to change the BIAS voltage for :")
@@ -141,7 +94,7 @@ def compare_voltage(channel, my_new_bias_voltage, ramp_rate, HVPS, my_slot, max_
         print("Current BIAS voltage:", current_voltage)
         print("New BIAS voltage:", new_bias_voltage)
         print("At voltage ramp rate (V/sec):", max_ramp_rate)
-        input_response = input("Please Confirm This Change (y/n) : ")
+        input_response = input("Please confirm this change (y/n) : ")
         if input_response == 'y':
             perform_bias = True
     return perform_bias
@@ -162,20 +115,25 @@ def get_max_voltage_ramp_rate(config_dict, channel_entry):
 def bias(args, config_dict, HVPS, my_slot, default_hvps_key):
     # bias: Runs checks and calls appropriate functions to bias a channel
     max_ramp_rate = 0
-    if (args.bias_voltage is None) and (args.channel_selected is not None):  # If we should go with the default voltage set in the config file
+    if (args.channel_selected is not None):  # If we should go with the default voltage set in the config file
         channel_entry = find_channel_in_config(args.channel_selected, config_dict[default_hvps_key])  # Get the config entry for channel
+
         if channel_entry is not None:
-            print(channel_entry)
+            if args.bias_voltage is not None:
+                my_new_bias_voltage = args.bias_voltage
+            else:
+                my_new_bias_voltage = channel_entry['max_bias_voltage']
             max_ramp_rate = get_max_voltage_ramp_rate(config_dict, channel_entry)  # Get the max volatage ramp rate RUp
-            if compare_voltage(channel_entry['channel_num'], channel_entry['max_bias_voltage'], max_ramp_rate, HVPS, my_slot, max_ramp_rate) is True:  # Check if we need to actually change the voltage or if it is already set
+            if compare_voltage(channel_entry, config_dict, my_new_bias_voltage, max_ramp_rate, HVPS, my_slot, max_ramp_rate) is True:  # Check if we need to actually change the voltage or if it is already set
                 HVPS[0].set_channel_param(args.hvps_name, my_slot, int(args.channel_selected), 'RUp', max_ramp_rate)  # Ensure the ramp up value is set to something safe
+                HVPS[0].set_channel_param(args.hvps_name, my_slot, int(args.channel_selected), 'ISet', 0)  # Ensure we have 0 current set
                 time.sleep(1)  # Sleep for a moment to make sure the setting has taken effect
-                HVPS[0].bias_channel(args.hvps_name, my_slot, int(args.channel_selected), int(channel_entry['max_bias_voltage']))  # Bias the channel
+                HVPS[0].bias_channel(args.hvps_name, my_slot, int(args.channel_selected), int(my_new_bias_voltage))  # Bias the channel
         else:
-            print("Must specify a BIAS voltage via --bias_voltage or put an entry for the channel in the config file and ensure Enabled is True")
+            print("!! Must specify a BIAS voltage via --bias_voltage or put an entry for the channel in the config file and ensure Enabled is True")
             exit(1)
     elif args.channel_selected is None:
-        print("Must specify --channel")
+        print("!! Must specify --channel")
         exit(1)
     #else:  # I think if I want this functionality I need to expand out the checks on the channel
     #    HVPS[0].bias_channel(args.hvps_name, my_slot, int(args.channel_selected), int(args.bias_voltage))
@@ -183,7 +141,7 @@ def bias(args, config_dict, HVPS, my_slot, default_hvps_key):
 
 
 def process_cli_args(args, config_dict):
-    # process_cli_args: Mostly does just that, processes command line arguements and runs appropriate tests 
+    # process_cli_args: Mostly does just that, processes command line arguements and runs appropriate tests
     default_hvps_key = None
     HVPS = []
     if "default_slot" in config_dict.keys():
@@ -196,6 +154,9 @@ def process_cli_args(args, config_dict):
             default_hvps_key = mykey
             HVPS.append(HVPS_Class(config_dict[mykey]))
 
+    if len(HVPS) == 0:
+        print("Could not find HVPS entry in config file.")
+        exit(1)
     if args.action == "status":
         chan_status = []
 
@@ -235,7 +196,7 @@ def main():
     parser = argparse.ArgumentParser(description='HVPS Controller', usage='%(prog)s --action [bias, unbias, status, set_name] --channel [channel num]')
     parser.add_argument('--hvps_name', dest='hvps_name', default=None, required=False)
 
-    parser.add_argument('--action', choices=('bias', 'unbias', 'status', 'bias_all', 'unbias_all', 'set_param'), required=False)
+    parser.add_argument('--action', choices=('bias', 'unbias', 'status', 'bias_all', 'unbias_all', 'set_param'), required=False, default='status')
 
     parser.add_argument('--param', dest='param', choices=('ISet', 'RUp', 'RDwn', 'PDwn', 'IMRange', 'Trip'), required=False, default=None,
                         help="Specify parameter to modify for channel, must specify with --action set_param")
@@ -250,16 +211,15 @@ def main():
     parser.add_argument('--channel', dest='channel_selected', required=False, default=None,
                         help="Specify channel to take action against, specify channel number or ALL")
 
-    parser.add_argument('--config_file', dest='config_file', required=False,
+    parser.add_argument('--config_file', dest='config_file', required=False, default="hvps.cfg",
                         help="Specify the complete path to the config file, by default we'll use hvps.cfg")
 
     parser.add_argument('--force', action='store_true', required=False, help="If used than no confirmation will be asked.. !!BE CAREFUL!!")
 
-    parser.set_defaults(config_file="hvps.cfg")
+    # parser.set_defaults(config_file="hvps.cfg")
     args, unknown = parser.parse_known_args()
     # print(args)
     config_dict = process_config_file_configobj(args.config_file)
-
     #caen_system_info_list, caen_global_params_dict = process_config_file(args.config_file)
     #hvps_channel_action = process_cli_args(args, caen_system_info_list, caen_global_params_dict)
     process_cli_args(args, config_dict)
