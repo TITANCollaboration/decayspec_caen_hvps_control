@@ -108,8 +108,8 @@ class HVPS_Class:
         # show_channel_status: Display all the parameter values for channels passed to it
         for channel_dict in channel_status_list[0]:
             my_status = ""
-            print("Slot:", channel_dict['slot'], end=' | ')
-            print("Channel Name:", channel_dict['chan_name'], end=' | ')
+            # print("Slot:", channel_dict['slot'], end=' | ')
+            # print("Channel Name:", channel_dict['chan_name'], end=' | ')
             print("Channel#:", channel_dict['chan_num'], end=' | ')
             for channel_params in channel_dict['chan_info']:
                 if channel_params['parameter'] == "Status":

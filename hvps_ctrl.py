@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # *************************************************************************************
 #   By: Jon Ringuette
 #   Created: March 23 2020 - During the great plague
@@ -40,10 +42,12 @@ class hvps_ctrl:
         if len(self.HVPS) == 0:
             print("Could not find HVPS entry in config file.")
             exit(1)
-
+        self.force = self.args.force
         self.channel_entry = self.find_channel_in_config()  # Get the config entry for channel
 
     def confirm_channel(self, action, new_voltage):
+        if self.force is True:
+            return True
         # confirm_channel: Prompt user to confirm a change to the voltage applied to a channel, requires a 'yes' or 'no' answer
         channel_status_list = self.HVPS[0].status_channel(None, self.my_slot, int(self.channel_entry['channel_num']))
         # Iterate over the status of channels until reaching the VSet parameter we're looking for which is the current voltage
@@ -153,7 +157,6 @@ def process_cli_args(args, config_dict):
     my_hvps_ctrl = hvps_ctrl(config_dict, args, my_slot)
 
     if args.action == "status":
-
         if args.channel_selected is None:
             args.channel_selected = "ALL"
 
@@ -197,9 +200,10 @@ def main():
     parser = argparse.ArgumentParser(description='HVPS Controller', usage='%(prog)s --action [bias, unbias, status, set_name] --channel [channel num]')
     parser.add_argument('--hvps_name', dest='hvps_name', default=None, required=False)
 
-    parser.add_argument('--action', choices=('bias', 'unbias', 'status', 'bias_all', 'unbias_all', 'set_param'), required=False, default='status')
+    parser.add_argument('--action', choices=('bias', 'unbias', 'status', 'set_param'), required=False, default='status')
 
-    parser.add_argument('--param', dest='param', choices=('ISet', 'RUp', 'RDwn', 'PDwn', 'IMRange', 'Trip'), required=False, default=None,
+    parser.add_argument('--param', dest='param', choices=('ISet', 'RUp', 'RDwn', 'PDwn', 'IMRange', 'Trip'),
+                        required=False, default=None,
                         help="Specify parameter to modify for channel, must specify with --action set_param")
     parser.add_argument('--param_value', dest='param_value', required=False, type=int, default=None,
                         help="Specify parameter value, must specify --action set_param and --param")
@@ -215,7 +219,8 @@ def main():
     parser.add_argument('--config_file', dest='config_file', required=False, default="hvps.cfg",
                         help="Specify the complete path to the config file, by default we'll use hvps.cfg")
 
-    parser.add_argument('--force', action='store_true', required=False, help="If used than no confirmation will be asked.. !!BE CAREFUL!!")
+    parser.add_argument('--force', action='store_true', default=False, required=False,
+                        help="If used than no confirmation will be asked.. !!BE CAREFUL!!")
 
     args, unknown = parser.parse_known_args()
     config_dict = process_config_file_configobj(args.config_file)
