@@ -6,7 +6,7 @@
 #            unless one needs direct access to the hardware which should be unusual.
 # *************************************************************************************
 
-from caen import CAEN_Controller as CC  # This is my low level wrapper for the actual C-Api
+from lib.caen import CAEN_Controller as CC  # This is my low level wrapper for the actual C-Api
 from pprint import pprint
 
 # *************************************************************************************

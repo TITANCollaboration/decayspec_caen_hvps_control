@@ -16,7 +16,7 @@ from pprint import pprint
 import time
 from os.path import exists
 
-from hvps import HVPS_Class  # Class that contains high level wrapper functions for the HVPS,
+from lib.hvps import HVPS_Class  # Class that contains high level wrapper functions for the HVPS,
 
 
 # *************************************************************************************
@@ -31,22 +31,18 @@ def process_config_file_configobj(config_file="hvps.cfg"):
     else:
         print("Could not open config file:", config_file)
         exit(1)
-    #pprint(config_dict)
-    #for mykey in config_dict.keys():
-    #    if mykey.startswith('HVPS_'):
-    #        print(config_dict[mykey].keys())
     return config_dict
 
 
 def confirm_channel(HVPS, my_slot, chan_obj, action, new_voltage):
     # confirm_channel: Prompt user to confirm a change to the voltage applied to a channel, requires a 'yes' or 'no' answer
     channel_status_list = HVPS[0].status_channel(None, my_slot, int(chan_obj['channel_num']))
-        # Iterate over the status of channels until reaching the VSet parameter we're looking for which is the current voltage
+    # Iterate over the status of channels until reaching the VSet parameter we're looking for which is the current voltage
     current_voltage = int(next(item for item in channel_status_list[0][0]['chan_info'] if item['parameter'] == 'VSet')['value'])
     print("-------------------------------------")
     print("CHANNEL NUMBER : %i " % int(chan_obj['channel_num']))
     print("DETECTOR NAME : %s" % chan_obj['detector_name'])
-    #print("Detector Position : %i" % chan_obj.detector_position)
+    # print("Detector Position : %i" % chan_obj.detector_position)
     print("MAX BIAS VOLTAGE : %i V" % int(chan_obj['max_bias_voltage']))
     print("RAMP RATE : %i V/sec" % int(chan_obj['ramp_rate']))
     print("CURRNET BIAS VOLTAGE : ", current_voltage)
@@ -63,7 +59,6 @@ def confirm_channel(HVPS, my_slot, chan_obj, action, new_voltage):
 def find_channel_in_config(channel, config_dict_hvps):
     # find_channel_in_config: Checks that there is a config entry for the channel before taking action on it and confirms if the channel is enabled
     channel_entry = None
-    #pprint(config_dict_hvps)
     for my_channel_key in config_dict_hvps.keys():
         if my_channel_key.startswith('CH_'):
             if (config_dict_hvps[my_channel_key]['channel_num'] == str(channel)) and config_dict_hvps[my_channel_key]['Enabled'].upper() == "True".upper():  # If channel exists in config file AND it is marked as ENABLED
@@ -142,8 +137,6 @@ def bias(args, config_dict, HVPS, my_slot, default_hvps_key):
     elif args.channel_selected is None:
         print("!! Must specify --channel")
         exit(1)
-    #else:  # I think if I want this functionality I need to expand out the checks on the channel
-    #    HVPS[0].bias_channel(args.hvps_name, my_slot, int(args.channel_selected), int(args.bias_voltage))
     return
 
 
@@ -165,7 +158,6 @@ def process_cli_args(args, config_dict):
         print("Could not find HVPS entry in config file.")
         exit(1)
     if args.action == "status":
-        chan_status = []
 
         if args.channel_selected is None:
             args.channel_selected = "ALL"
@@ -188,11 +180,7 @@ def process_cli_args(args, config_dict):
             print("Must specify --channel")
         else:
             HVPS[0].set_channel_param(args.hvps_name, my_slot, int(args.channel_selected), args.param, args.param_value)
-    #elif args.action == "set_name":
-    #    if args.channel_selected is None:
-    #        print("Must specify --slot and --channel")
-    #    else:
-    #        HVPS[0].set_channel_name(args.hvps_name, my_slot, int(args.channel_selected), "j1")
+
     del HVPS[0]
     #print("Time 2")  # Uncommented this and the next line to try init'ing again.  This should work if CAEN ever fixes their CApi which they promised back in Nov2020
     #HVPS = HVPS_Class(caen_system_info_list)
@@ -224,12 +212,8 @@ def main():
 
     parser.add_argument('--force', action='store_true', required=False, help="If used than no confirmation will be asked.. !!BE CAREFUL!!")
 
-    # parser.set_defaults(config_file="hvps.cfg")
     args, unknown = parser.parse_known_args()
-    # print(args)
     config_dict = process_config_file_configobj(args.config_file)
-    #caen_system_info_list, caen_global_params_dict = process_config_file(args.config_file)
-    #hvps_channel_action = process_cli_args(args, caen_system_info_list, caen_global_params_dict)
     process_cli_args(args, config_dict)
 
 
