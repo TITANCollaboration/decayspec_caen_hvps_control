@@ -114,8 +114,6 @@ class hvps_ctrl:
         # bias: Runs checks and calls appropriate functions to bias a channel
         max_ramp_rate = 0
         if (self.channel_selected is not None):  # If we should go with the default voltage set in the config file
-            self.channel_entry = self.find_channel_in_config()  # Get the config entry for channel
-
             if self.channel_entry is not None:
                 if self.args.bias_voltage is not None:
                     my_new_bias_voltage = self.args.bias_voltage
