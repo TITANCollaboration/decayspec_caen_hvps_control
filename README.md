@@ -44,3 +44,5 @@ The status of all channels will be displayed by running hvps_ctrl.py without any
 * hvps_ctrl.py : Main interface to the control software.  Handles all user interactions
 * lib/hvps.py : Provides a nicer interface to the CAEN C-wrapper and should be used for all programatic iteractions with the power supply
 * lib/caen.py : Wraps the C-api using Python's ctypes interface and is accessed via hvps.py
+* ctest/ : Some c code to directly test the CAEN C-Api
+* flaskr/ : Test code for making a web interface for HVPS interactions
