@@ -7,6 +7,8 @@ Must install : https://www.caen.it/products/caen-hv-wrapper-library/
 * Network access to CAEN power supply
 
 # Bias
+* NOTE: current (I) is automatically set to 0 when biasing a channel, this is necessary for HPGe's.
+
 ## Bias based on config file settings
 The following will bias channel 1 using settings defined in config file (hvps.cfg)
 ```
