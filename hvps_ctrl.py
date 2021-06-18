@@ -192,6 +192,7 @@ def process_config_file_configobj(config_file="hvps.cfg"):
         config_dict = ConfigObj(config_file)  # Change this to config_file after testing
     else:
         print("Could not open config file:", config_file)
+        print("Please specify using --config <config file name>")
         exit(1)
     return config_dict
 
