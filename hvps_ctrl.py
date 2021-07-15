@@ -177,6 +177,11 @@ def process_cli_args(args, config_dict):
         if args.channel_selected is None:
             print("Must specify --channel")
         else:
+            if args.param in ['Pon', 'Pw', 'PDwn', 'TripInt', 'TripExt']:
+                args.param_value = int(args.param_value)
+            else:
+                args.param_value = float(args.param_value)
+                
             my_hvps_ctrl.HVPS[0].set_channel_param(args.hvps_name, my_slot, args.channel_selected, args.param, args.param_value)
 
     del my_hvps_ctrl.HVPS[0]
@@ -206,9 +211,9 @@ def main():
     parser.add_argument('--param', dest='param', choices=('ISet', 'RUp', 'RDwn', 'Pon', 'Pw', 'TripInt', 'TripExt', 'PDwn', 'IMRange', 'Trip'),
                         required=False, default=None,
                         help="Specify parameter to modify for channel, must specify with --action set_param")
-    parser.add_argument('--param_value', dest='param_value', type=float, required=False, default=None,
+    parser.add_argument('--param_value', dest='param_value', required=False, default=None,
                         help="Specify parameter value, must specify --action set_param and --param")
-    parser.add_argument('--bias_voltage', dest='bias_voltage', required=False, default=None,
+    parser.add_argument('--bias_voltage', dest='bias_voltage', type=int, required=False, default=None,
                         help="Specify new bias voltage for a channel")
 
     parser.add_argument('--slot', dest='slot_selected', type=int, required=False, default=None,
