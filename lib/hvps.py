@@ -49,7 +49,7 @@ class HVPS_Class:
         #                  sequence that is a 1 represents a different status.  Such as 0b0000000000001 would read as 0 bit is 1
         #                  which would indicate that the channel is ON
         chstatus_dict = {'on': 0, 'rup': 0, 'rdown': 0, 'overcurrent': 0, 'overvoltage': 0, 'undervoltage': 0, 'ext_trip': 0, 'maxv': 0,
-                         'ext_disable': 0, 'int_trip': 0, 'calibration_error': 0, 'unplugged': 0, 'overvoltage_protection': 0,
+                         'ext_disable': 0, 'int_trip': 0, 'inhibit_trip': 0, 'unplugged': 0, 'overvoltage_protection': 0,
                          'power_fail': 0, 'temp_error': 0}
 
         chstatus_dict['on'] = chstatus & (1 << 0)  # bit 0
@@ -62,7 +62,7 @@ class HVPS_Class:
         chstatus_dict['maxv'] = chstatus & (1 << 7)  # bit 7
         chstatus_dict['ext_disable'] = chstatus & (1 << 8)  # bit 8
         chstatus_dict['int_trip'] = chstatus & (1 << 9)  # bit 9
-        chstatus_dict['calibration_error'] = chstatus & (1 << 10)  # bit 10
+        chstatus_dict['inhibit_trip'] = chstatus & (1 << 10)  # bit 10
         chstatus_dict['unplugged'] = chstatus & (1 << 11)  # bit 11
         chstatus_dict['overvoltage_protection'] = chstatus & (1 << 13)  # bit 13
         chstatus_dict['power_fail'] = chstatus & (1 << 14)  # bit 14
