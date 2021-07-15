@@ -117,6 +117,7 @@ class hvps_ctrl:
     def bias(self):
         # bias: Runs checks and calls appropriate functions to bias a channel
         max_ramp_rate = 0
+        my_iset = 0.5
         if (self.channel_selected is not None):  # If we should go with the default voltage set in the config file
             if self.channel_entry is not None:
                 if self.args.bias_voltage is not None:
@@ -127,7 +128,7 @@ class hvps_ctrl:
                 if self.compare_voltage(my_new_bias_voltage) is True:  # Check if we need to actually change the voltage or if it is already set
                     self.HVPS[0].set_channel_param(self.hvps_name, self.my_slot, self.channel_selected, 'RUp', max_ramp_rate)  # Ensure the ramp up value is set to something safe
                     self.HVPS[0].set_channel_param(self.hvps_name, self.my_slot, self.channel_selected, 'RDwn', max_ramp_rate)  # Ensure the ramp up value is set to something safe
-                    self.HVPS[0].set_channel_param(self.hvps_name, self.my_slot, self.channel_selected, 'ISet', 0)  # Ensure we have 0 current set
+                    self.HVPS[0].set_channel_param(self.hvps_name, self.my_slot, self.channel_selected, 'ISet', my_iset)  # Ensure we have 0 current set
                     time.sleep(1)  # Sleep for a moment to make sure the setting has taken effect
                     self.HVPS[0].bias_channel(self.hvps_name, self.my_slot, self.channel_selected, int(my_new_bias_voltage))  # Bias the channel
             else:
@@ -181,7 +182,7 @@ def process_cli_args(args, config_dict):
                 args.param_value = int(args.param_value)
             else:
                 args.param_value = float(args.param_value)
-                
+
             my_hvps_ctrl.HVPS[0].set_channel_param(args.hvps_name, my_slot, args.channel_selected, args.param, args.param_value)
 
     del my_hvps_ctrl.HVPS[0]

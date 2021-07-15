@@ -6,6 +6,10 @@ Must install : https://www.caen.it/products/caen-hv-wrapper-library/
 * CAEN wrapper library
 * Network access to CAEN power supply
 
+# Enable CHANNEL
+
+hvps_ctrl.py --action set_param --param Pw --param_value 1 --channel 0
+
 # Bias
 * NOTE: current (I) is automatically set to 0 when biasing a channel, this is necessary for HPGe's.
 
