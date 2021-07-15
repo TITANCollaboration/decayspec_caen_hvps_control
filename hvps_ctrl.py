@@ -206,7 +206,7 @@ def main():
     parser.add_argument('--param', dest='param', choices=('ISet', 'RUp', 'RDwn', 'PDwn', 'IMRange', 'Trip'),
                         required=False, default=None,
                         help="Specify parameter to modify for channel, must specify with --action set_param")
-    parser.add_argument('--param_value', dest='param_value', required=False, default=None,
+    parser.add_argument('--param_value', dest='param_value', type=float, required=False, default=None,
                         help="Specify parameter value, must specify --action set_param and --param")
     parser.add_argument('--bias_voltage', dest='bias_voltage', required=False, default=None,
                         help="Specify new bias voltage for a channel")
