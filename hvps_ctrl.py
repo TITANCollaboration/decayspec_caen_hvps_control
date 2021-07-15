@@ -203,7 +203,7 @@ def main():
 
     parser.add_argument('--action', choices=('bias', 'unbias', 'status', 'set_param'), required=False, default='status')
 
-    parser.add_argument('--param', dest='param', choices=('ISet', 'RUp', 'RDwn', 'PDwn', 'IMRange', 'Trip'),
+    parser.add_argument('--param', dest='param', choices=('ISet', 'RUp', 'RDwn', 'Pon', 'Pw', 'TripInt', 'TripExt', 'PDwn', 'IMRange', 'Trip'),
                         required=False, default=None,
                         help="Specify parameter to modify for channel, must specify with --action set_param")
     parser.add_argument('--param_value', dest='param_value', type=float, required=False, default=None,
