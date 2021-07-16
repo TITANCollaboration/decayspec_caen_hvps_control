@@ -84,7 +84,8 @@ class HVPS_Class:
         # bias_channel: You guessed it, this allows us to specify a channel and what voltage we would like to set it at
         hvps_entry = self.get_object_entry_for_hvps_by_name(hvps_name)
         print("BIAS - DEVICE:", hvps_entry.device_name, " CHANNEL:", channel, "SLOT:", slot)
-        hvps_entry.set_channel_parameter(slot, channel, 'VSet', bias_voltage)
+        hvps_entry.set_channel_parameter(slot, channel, 'Pw', 1)  # Enable the channel first
+        hvps_entry.set_channel_parameter(slot, channel, 'VSet', bias_voltage)  # Then set the voltage
 
     def set_channel_param(self, hvps_name, slot, channel, param, param_value):
         # set_channel_param: Sets the channel parameter such as RUp, RDown, ISet, etc..
