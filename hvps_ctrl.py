@@ -183,7 +183,7 @@ def process_cli_args(args, config_dict):
     elif args.chan_enable is not None:
         my_hvps_ctrl.HVPS[0].set_channel_param(args.hvps_name, my_slot, int(args.chan_enable), 'Pw', 1)  # Ensure we have 0 current set
     elif args.chan_disable is not None:
-        my_hvps_ctrl.HVPS[0].set_channel_param(args.hvps_name, my_slot, int(args.chan_disable), 'Pw', 0)  # Ensure we have 0 current set
+        my_hvps_ctrl.HVPS[0].set_channel_param(args.hvps_name, my_slot, int(args.chan_enable), 'Pw', 0)  # Ensure we have 0 current set
 
 
     else:
@@ -214,7 +214,7 @@ def main():
                         help="Show status of channels (can specify --chan)")
     parser.add_argument('--unbias', action='store_true', default=False, required=False,
                         help="Unbias channel specified with --chan #")
-    parser.add_argument('--action', choices=('set_param'), required=False, default=None)
+    parser.add_argument('--action', choices=('unbias', 'set_param'), required=False, default=None)
 
     parser.add_argument('--param', dest='param', choices=('ISet', 'RUp', 'RDwn', 'Pon', 'Pw', 'TripInt', 'TripExt', 'PDwn', 'IMRange', 'Trip'),
                         required=False, default=None,
